@@ -1,0 +1,2521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BankLens — Bank Statement Analytics &amp; Management Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.3/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
+<style>
+:root{
+  --navy:#0E1B2C;
+  --navy-2:#152A42;
+  --charcoal:#1B2733;
+  --ink:#101820;
+  --paper:#FFFFFF;
+  --grey-50:#F6F8FA;
+  --grey-100:#EEF1F5;
+  --grey-200:#E3E7ED;
+  --grey-400:#9AA6B2;
+  --grey-600:#5C6B7A;
+  --blue:#3B6FE0;
+  --blue-dark:#2A54B8;
+  --blue-tint:#EAF0FD;
+  --green:#1E8E5A;
+  --green-tint:#E7F6EE;
+  --amber:#B5750F;
+  --amber-tint:#FBF1DF;
+  --red:#C4392B;
+  --red-tint:#FBEAE8;
+  --font-ui:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
+  --radius:8px;
+  --shadow-sm:0 1px 2px rgba(14,27,44,.06),0 1px 1px rgba(14,27,44,.04);
+  --shadow-md:0 4px 16px rgba(14,27,44,.08);
+  --shadow-lg:0 12px 32px rgba(14,27,44,.14);
+}
+*,*::before,*::after{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{margin:0;font-family:var(--font-ui);color:var(--charcoal);background:var(--grey-50);-webkit-font-smoothing:antialiased;}
+h1,h2,h3,h4{margin:0;font-weight:800;letter-spacing:-.02em;color:var(--navy);}
+p{margin:0;}
+button{font-family:inherit;}
+a{color:inherit;}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+.hidden{display:none !important;}
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);}
+
+/* ---------- motion ---------- */
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+@keyframes slideUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+@keyframes spin{to{transform:rotate(360deg);}}
+@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important;}}
+.page{animation:fadeIn .35s ease both;}
+.card,.kpi,.insight-card,.q-card{animation:slideUp .4s ease both;}
+
+/* ---------- buttons ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 22px;border-radius:7px;border:1px solid transparent;font-weight:700;font-size:14.5px;cursor:pointer;transition:transform .12s ease, box-shadow .12s ease, background .15s ease, border-color .15s ease;white-space:nowrap;}
+.btn:active{transform:translateY(1px);}
+.btn-primary{background:var(--blue);color:#fff;box-shadow:var(--shadow-sm);}
+.btn-primary:hover{background:var(--blue-dark);}
+.btn-secondary{background:#fff;color:var(--navy);border-color:var(--grey-200);}
+.btn-secondary:hover{border-color:var(--blue);color:var(--blue);}
+.btn-ghost{background:transparent;color:var(--grey-600);border-color:transparent;}
+.btn-ghost:hover{background:var(--grey-100);color:var(--navy);}
+.btn-sm{padding:7px 14px;font-size:13px;border-radius:6px;}
+.btn[disabled]{opacity:.5;cursor:not-allowed;}
+.btn .spinner{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;animation:spin .7s linear infinite;}
+
+/* ---------- top nav (landing) ---------- */
+.landing-nav{position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;padding:18px 5vw;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--grey-200);}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:19px;color:var(--navy);letter-spacing:-.02em;}
+.brand-mark{width:32px;height:32px;flex:none;}
+.landing-nav .navlinks{display:flex;gap:28px;font-weight:600;font-size:14px;color:var(--grey-600);}
+.landing-nav .navlinks a{text-decoration:none;}
+.landing-nav .navlinks a:hover{color:var(--navy);}
+.landing-actions{display:flex;gap:10px;}
+
+/* ---------- hero ---------- */
+.hero{padding:96px 5vw 64px;max-width:1180px;margin:0 auto;text-align:center;}
+.hero-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:99px;background:var(--blue-tint);color:var(--blue-dark);font-weight:700;font-size:12.5px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:22px;}
+.hero h1{font-size:clamp(34px,5vw,58px);line-height:1.06;max-width:920px;margin:0 auto;}
+.hero .accent{color:var(--blue);}
+.hero-sub{max-width:640px;margin:22px auto 0;color:var(--grey-600);font-size:17.5px;line-height:1.55;}
+.hero-cta{display:flex;gap:14px;justify-content:center;margin-top:34px;flex-wrap:wrap;}
+.hero-privacy{max-width:680px;margin:28px auto 0;padding:14px 18px;border:1px solid var(--grey-200);border-radius:10px;background:#fff;font-size:13px;color:var(--grey-600);display:flex;gap:10px;text-align:left;}
+.hero-privacy b{color:var(--navy);}
+
+.hiw{max-width:1100px;margin:70px auto 0;padding:0 5vw;}
+.hiw-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:30px;}
+.hiw-step{background:#fff;border:1px solid var(--grey-200);border-radius:12px;padding:22px 20px;}
+.hiw-num{font-family:var(--font-mono);font-weight:600;color:var(--blue);font-size:13px;letter-spacing:.06em;}
+.hiw-step h4{margin-top:10px;font-size:16px;}
+.hiw-step p{margin-top:6px;color:var(--grey-600);font-size:13.6px;line-height:1.5;}
+.section-title{text-align:center;font-size:26px;}
+.section-sub{text-align:center;color:var(--grey-600);margin-top:8px;font-size:14.5px;}
+
+.footer-disclaimer{max-width:900px;margin:70px auto 40px;padding:0 5vw;color:var(--grey-400);font-size:12.5px;line-height:1.6;text-align:center;}
+.landing-footer{border-top:1px solid var(--grey-200);padding:30px 5vw;color:var(--grey-400);font-size:13px;display:flex;justify-content:space-between;align-items:center;}
+
+/* ---------- upload page ---------- */
+.narrow-page{max-width:920px;margin:0 auto;padding:60px 5vw 100px;}
+.narrow-page h2{font-size:28px;}
+.narrow-page .sub{color:var(--grey-600);margin-top:8px;font-size:14.5px;}
+.dropzone{margin-top:34px;border:2px dashed var(--grey-200);border-radius:14px;background:#fff;padding:56px 26px;text-align:center;cursor:pointer;transition:border-color .15s, background .15s;}
+.dropzone.drag{border-color:var(--blue);background:var(--blue-tint);}
+.dropzone .dz-icon{width:52px;height:52px;margin:0 auto 16px;color:var(--blue);}
+.dropzone h3{font-size:18px;}
+.dropzone p{margin-top:6px;color:var(--grey-600);font-size:13.5px;}
+.dz-formats{margin-top:14px;font-family:var(--font-mono);font-size:12px;color:var(--grey-400);letter-spacing:.03em;}
+.upload-or{display:flex;align-items:center;gap:14px;margin:26px 0;color:var(--grey-400);font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;}
+.upload-or::before,.upload-or::after{content:'';flex:1;height:1px;background:var(--grey-200);}
+.file-summary{margin-top:22px;background:#fff;border:1px solid var(--grey-200);border-radius:12px;padding:20px 22px;display:flex;align-items:center;gap:16px;}
+.file-summary .fico{width:40px;height:40px;border-radius:8px;background:var(--blue-tint);color:var(--blue-dark);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex:none;}
+.file-summary .fmeta{flex:1;}
+.file-summary .fname{font-weight:700;color:var(--navy);font-size:14.5px;}
+.file-summary .fdetail{color:var(--grey-600);font-size:12.5px;margin-top:2px;font-family:var(--font-mono);}
+.upload-actions{display:flex;justify-content:flex-end;gap:12px;margin-top:26px;}
+
+/* ---------- processing ---------- */
+.processing-wrap{max-width:640px;margin:100px auto;padding:0 5vw;text-align:center;}
+.proc-ring{width:74px;height:74px;margin:0 auto 26px;border-radius:50%;border:4px solid var(--grey-200);border-top-color:var(--blue);animation:spin 1s linear infinite;}
+.proc-title{font-size:21px;}
+.proc-sub{color:var(--grey-600);margin-top:8px;font-size:13.5px;font-family:var(--font-mono);}
+.proc-steps{margin-top:34px;text-align:left;background:#fff;border:1px solid var(--grey-200);border-radius:12px;padding:22px 24px;}
+.proc-step{display:flex;align-items:center;gap:12px;padding:9px 0;font-size:14px;color:var(--grey-400);}
+.proc-step.done{color:var(--navy);}
+.proc-step.active{color:var(--blue-dark);font-weight:700;}
+.proc-step .mark{width:20px;height:20px;flex:none;border-radius:50%;border:2px solid currentColor;display:flex;align-items:center;justify-content:center;font-size:11px;}
+.proc-bar-track{margin-top:20px;height:6px;border-radius:99px;background:var(--grey-100);overflow:hidden;}
+.proc-bar-fill{height:100%;background:var(--blue);border-radius:99px;transition:width .25s ease;width:0%;}
+
+/* ---------- app shell ---------- */
+.app-shell{display:none;min-height:100vh;}
+.app-shell.active{display:flex;}
+.sidebar{width:250px;flex:none;background:var(--navy);color:#cbd6e6;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;transition:width .2s ease;}
+.sidebar .brand{color:#fff;padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,.08);}
+.sidebar .stmt-chip{margin:14px 18px;padding:10px 12px;border-radius:8px;background:rgba(255,255,255,.06);font-size:12px;}
+.sidebar .stmt-chip .lbl{color:#7f92aa;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;}
+.sidebar .stmt-chip .val{margin-top:3px;font-family:var(--font-mono);color:#e7edf5;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.navgroup{padding:10px 12px;}
+.navgroup .glabel{padding:14px 10px 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:#5f7391;font-weight:700;}
+.navitem{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:7px;font-size:14px;font-weight:600;color:#aebdd0;cursor:pointer;transition:background .15s, color .15s;margin-bottom:2px;}
+.navitem svg{width:17px;height:17px;flex:none;opacity:.85;}
+.navitem:hover{background:rgba(255,255,255,.06);color:#fff;}
+.navitem.active{background:var(--blue);color:#fff;}
+.sidebar-footer{margin-top:auto;padding:16px 20px;font-size:11px;color:#5f7391;border-top:1px solid rgba(255,255,255,.08);}
+
+.main-area{flex:1;min-width:0;}
+.topbar{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--grey-200);padding:14px 30px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+.topbar h2{font-size:19px;}
+.topbar .tb-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.menu-btn{display:none;background:none;border:1px solid var(--grey-200);border-radius:7px;width:38px;height:38px;align-items:center;justify-content:center;cursor:pointer;}
+
+.content{padding:26px 30px 70px;max-width:1360px;}
+
+/* ---------- filters bar ---------- */
+.filters-bar{display:flex;flex-wrap:wrap;gap:10px;background:#fff;border:1px solid var(--grey-200);border-radius:10px;padding:14px 16px;margin-bottom:24px;align-items:flex-end;}
+.filt-field{display:flex;flex-direction:column;gap:5px;}
+.filt-field label{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--grey-600);font-weight:700;}
+.filt-field select,.filt-field input{border:1px solid var(--grey-200);border-radius:6px;padding:8px 10px;font-size:13px;font-family:inherit;color:var(--navy);background:#fff;min-width:120px;}
+.filt-field input[type=text]{min-width:170px;}
+.filters-bar .btn{margin-left:auto;}
+
+/* ---------- KPI cards ---------- */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:22px;}
+.kpi{background:#fff;border:1px solid var(--grey-200);border-radius:12px;padding:18px 20px;position:relative;overflow:hidden;}
+.kpi .klabel{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--grey-600);font-weight:700;display:flex;justify-content:space-between;align-items:center;}
+.kpi .kvalue{margin-top:10px;font-family:var(--font-mono);font-size:25px;font-weight:600;color:var(--navy);}
+.kpi .ksub{margin-top:6px;font-size:12px;color:var(--grey-400);}
+.kpi.accent-blue{border-top:3px solid var(--blue);}
+.kpi.accent-green{border-top:3px solid var(--green);}
+.kpi.accent-red{border-top:3px solid var(--red);}
+.kpi.accent-amber{border-top:3px solid var(--amber);}
+.kpi .ktrend{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:99px;}
+.ktrend.pos{color:var(--green);background:var(--green-tint);}
+.ktrend.neg{color:var(--red);background:var(--red-tint);}
+
+/* ---------- generic card / section ---------- */
+.card{background:#fff;border:1px solid var(--grey-200);border-radius:12px;padding:22px 24px;margin-bottom:24px;}
+.card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;gap:12px;flex-wrap:wrap;}
+.card-head h3{font-size:17px;}
+.card-head .card-sub{color:var(--grey-600);font-size:12.5px;margin-top:4px;}
+.chart-wrap{position:relative;height:300px;}
+.two-col{display:grid;grid-template-columns:1.3fr 1fr;gap:18px;}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+
+/* ---------- tables ---------- */
+table{width:100%;border-collapse:collapse;font-size:13.5px;}
+th{text-align:left;font-size:10.8px;text-transform:uppercase;letter-spacing:.04em;color:var(--grey-600);font-weight:700;padding:9px 12px;border-bottom:2px solid var(--grey-200);white-space:nowrap;}
+td{padding:10px 12px;border-bottom:1px solid var(--grey-100);color:var(--charcoal);}
+tr:hover td{background:var(--grey-50);}
+.num{font-family:var(--font-mono);text-align:right;font-variant-numeric:tabular-nums;}
+.amt-credit{color:var(--green);}
+.amt-debit{color:var(--red);}
+.table-scroll{overflow-x:auto;}
+.rank-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:var(--grey-100);font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--grey-600);margin-right:8px;}
+
+/* ---------- badges / status ---------- */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:99px;font-size:11.5px;font-weight:700;}
+.badge::before{content:'';width:7px;height:7px;border-radius:50%;}
+.badge.high{background:var(--green-tint);color:var(--green);}
+.badge.high::before{background:var(--green);}
+.badge.medium{background:var(--amber-tint);color:var(--amber);}
+.badge.medium::before{background:var(--amber);}
+.badge.low{background:var(--red-tint);color:var(--red);}
+.badge.low::before{background:var(--red);}
+.status-pill{padding:3px 10px;border-radius:99px;font-size:11.5px;font-weight:700;}
+.status-pill.valid{background:var(--green-tint);color:var(--green);}
+.status-pill.review{background:var(--amber-tint);color:var(--amber);}
+.status-pill.exception{background:var(--red-tint);color:var(--red);}
+
+/* ---------- insights ---------- */
+.insight-list{display:flex;flex-direction:column;gap:10px;}
+.insight-card{display:flex;gap:12px;padding:14px 16px;border:1px solid var(--grey-200);border-radius:9px;background:var(--grey-50);}
+.insight-card .idot{width:8px;height:8px;border-radius:50%;background:var(--blue);flex:none;margin-top:6px;}
+.insight-card p{font-size:13.8px;line-height:1.5;color:var(--charcoal);}
+
+/* ---------- questions grid ---------- */
+.q-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.q-card{border:1px solid var(--grey-200);border-radius:10px;padding:16px;background:#fff;cursor:pointer;font-weight:700;font-size:14px;color:var(--navy);transition:border-color .15s,box-shadow .15s;}
+.q-card:hover{border-color:var(--blue);box-shadow:var(--shadow-sm);}
+.q-card span{display:block;font-weight:500;color:var(--grey-600);font-size:12px;margin-top:5px;}
+
+/* ---------- empty state ---------- */
+.empty-state{text-align:center;padding:50px 20px;color:var(--grey-600);}
+.empty-state .es-icon{width:44px;height:44px;margin:0 auto 14px;color:var(--grey-400);}
+.empty-state h4{font-size:15px;color:var(--navy);}
+.empty-state p{margin-top:6px;font-size:13px;}
+
+/* ---------- pagination ---------- */
+.pager{display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:12.5px;color:var(--grey-600);}
+.pager .pbtns{display:flex;gap:6px;}
+.pager button{border:1px solid var(--grey-200);background:#fff;border-radius:6px;width:30px;height:30px;cursor:pointer;font-size:12.5px;}
+.pager button:hover{border-color:var(--blue);color:var(--blue);}
+.pager button[disabled]{opacity:.4;cursor:not-allowed;}
+
+/* ---------- modal (column mapping / details) ---------- */
+.modal-backdrop{position:fixed;inset:0;background:rgba(14,27,44,.5);display:none;align-items:center;justify-content:center;z-index:100;padding:20px;}
+.modal-backdrop.active{display:flex;}
+.modal{background:#fff;border-radius:14px;max-width:640px;width:100%;max-height:88vh;overflow-y:auto;padding:26px 28px;box-shadow:var(--shadow-lg);}
+.modal h3{font-size:18px;}
+.modal .modal-sub{color:var(--grey-600);font-size:13px;margin-top:6px;}
+.map-row{display:grid;grid-template-columns:1fr 26px 1fr auto;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--grey-100);}
+.map-row .detected{font-size:13px;color:var(--navy);font-weight:600;}
+.map-row select{border:1px solid var(--grey-200);border-radius:6px;padding:7px 8px;font-size:13px;width:100%;}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px;}
+
+/* ---------- settings ---------- */
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+.setting-row{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+.setting-row label{font-size:12.5px;font-weight:700;color:var(--navy);}
+.setting-row .hint{font-size:11.5px;color:var(--grey-600);}
+.setting-row select,.setting-row input[type=number]{border:1px solid var(--grey-200);border-radius:6px;padding:9px 11px;font-size:13.5px;max-width:260px;}
+.map-list{margin-top:10px;font-size:13px;}
+.map-list .mrow{display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--grey-100);}
+.map-list .mrow button{background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;font-weight:700;}
+
+/* ---------- toast ---------- */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;padding:13px 18px;border-radius:9px;font-size:13.5px;box-shadow:var(--shadow-lg);z-index:200;display:flex;align-items:center;gap:10px;animation:slideUp .3s ease;}
+
+.limitation-note{margin-top:10px;padding:10px 12px;border-radius:8px;background:var(--amber-tint);color:#7a5209;font-size:12.5px;display:flex;gap:8px;}
+
+/* ---------- footer disclaimer in app ---------- */
+.app-footer{padding:20px 30px 40px;color:var(--grey-400);font-size:11.5px;line-height:1.6;max-width:1000px;}
+
+/* ---------- responsive ---------- */
+@media (max-width:1080px){
+  .kpi-row{grid-template-columns:repeat(2,1fr);}
+  .two-col,.grid-2{grid-template-columns:1fr;}
+  .q-grid{grid-template-columns:repeat(2,1fr);}
+  .hiw-grid{grid-template-columns:repeat(2,1fr);}
+}
+@media (max-width:820px){
+  .landing-nav .navlinks{display:none;}
+  .sidebar{position:fixed;left:-260px;z-index:60;box-shadow:var(--shadow-lg);}
+  .sidebar.open{left:0;}
+  .menu-btn{display:flex;}
+  .content{padding:20px 16px 60px;}
+  .topbar{padding:12px 16px;}
+  .kpi-row{grid-template-columns:1fr 1fr;}
+  .q-grid{grid-template-columns:1fr;}
+}
+@media (max-width:520px){
+  .kpi-row{grid-template-columns:1fr;}
+  .hiw-grid{grid-template-columns:1fr;}
+  .filters-bar{flex-direction:column;align-items:stretch;}
+  .filters-bar .btn{margin-left:0;}
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================ LANDING PAGE ============================================================ -->
+<div id="page-landing" class="page">
+  <nav class="landing-nav">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" fill="none"><rect x="2" y="16" width="5" height="14" rx="1" fill="#3B6FE0"/><rect x="10" y="10" width="5" height="20" rx="1" fill="#0E1B2C"/><rect x="18" y="4" width="5" height="26" rx="1" fill="#3B6FE0"/><circle cx="26" cy="6" r="4.2" fill="none" stroke="#0E1B2C" stroke-width="2"/><line x1="29" y1="9" x2="31.5" y2="11.5" stroke="#0E1B2C" stroke-width="2" stroke-linecap="round"/></svg>
+      BankLens
+    </div>
+    <div class="navlinks">
+      <a href="#hiw">How it works</a>
+      <a href="#questions-preview">Insights</a>
+      <a href="#privacy">Privacy</a>
+    </div>
+    <div class="landing-actions">
+      <button class="btn btn-secondary btn-sm" id="nav-try-demo">Try Demo Data</button>
+      <button class="btn btn-primary btn-sm" id="nav-analyze">Analyze a Statement</button>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="hero-eyebrow">Bank Statement Analytics &amp; Management Intelligence</div>
+    <h1>Turn Bank Statements Into <span class="accent">Business Insights</span></h1>
+    <p class="hero-sub">Upload a bank statement and instantly understand cash inflows, outflows, transaction patterns, major payment recipients, expenses and financial trends — without reading a single row by hand.</p>
+    <div class="hero-cta">
+      <button class="btn btn-primary" id="hero-analyze">Analyze a Statement</button>
+      <button class="btn btn-secondary" id="hero-demo">Try Demo Data</button>
+    </div>
+    <div class="hero-privacy" id="privacy">
+      <span>🔒</span>
+      <span><b>Your financial data is confidential.</b> This prototype processes uploaded files locally in your browser wherever supported. Do not upload real client or employer statements to public demonstration environments.</span>
+    </div>
+  </header>
+
+  <section class="hiw" id="hiw">
+    <h2 class="section-title">From statement to insight, in four steps</h2>
+    <p class="section-sub">BankLens extracts, classifies and analyzes transactions automatically — you review and decide.</p>
+    <div class="hiw-grid">
+      <div class="hiw-step"><div class="hiw-num">01</div><h4>Upload</h4><p>Upload a PDF, Excel or CSV bank statement, or try synthetic demo data.</p></div>
+      <div class="hiw-step"><div class="hiw-num">02</div><h4>Analyze</h4><p>Transactions are extracted, normalized and classified by type and category.</p></div>
+      <div class="hiw-step"><div class="hiw-num">03</div><h4>Understand</h4><p>Explore cash flow, expense categories, counterparties and recurring patterns.</p></div>
+      <div class="hiw-step"><div class="hiw-num">04</div><h4>Decide</h4><p>Use management-ready analytics — export a report or a processed workbook.</p></div>
+    </div>
+  </section>
+
+  <section class="hiw" id="questions-preview">
+    <h2 class="section-title">Answers management actually asks for</h2>
+    <p class="section-sub">Where did the money go? Who did we pay the most? What needs review?</p>
+    <div class="hiw-grid" style="grid-template-columns:repeat(4,1fr);margin-top:26px;">
+      <div class="hiw-step"><h4>Cash movement</h4><p>Inflow, outflow, net movement and monthly trend, calculated from transaction-level data.</p></div>
+      <div class="hiw-step"><h4>Payment behaviour</h4><p>Top vendors, top customers, largest single transactions.</p></div>
+      <div class="hiw-step"><h4>Costs &amp; charges</h4><p>Bank charges, interest paid/received, penalties — tracked separately.</p></div>
+      <div class="hiw-step"><h4>Data quality</h4><p>Balance consistency checks, duplicates, and transactions requiring review.</p></div>
+    </div>
+  </section>
+
+  <p class="footer-disclaimer">BankLens is an analytical prototype designed to assist financial review. Classification, extraction and anomaly detection may contain errors and should be reviewed by a qualified professional. It does not provide accounting, financial, tax or legal advice.</p>
+
+  <footer class="landing-footer">
+    <span>© BankLens — analytical prototype</span>
+    <span>From Bank Statement to Business Insight.</span>
+  </footer>
+</div>
+
+<!-- ============================================================ UPLOAD PAGE ============================================================ -->
+<div id="page-upload" class="page hidden">
+  <nav class="landing-nav">
+    <div class="brand" style="cursor:pointer" id="upload-back-brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" fill="none"><rect x="2" y="16" width="5" height="14" rx="1" fill="#3B6FE0"/><rect x="10" y="10" width="5" height="20" rx="1" fill="#0E1B2C"/><rect x="18" y="4" width="5" height="26" rx="1" fill="#3B6FE0"/><circle cx="26" cy="6" r="4.2" fill="none" stroke="#0E1B2C" stroke-width="2"/><line x1="29" y1="9" x2="31.5" y2="11.5" stroke="#0E1B2C" stroke-width="2" stroke-linecap="round"/></svg>
+      BankLens
+    </div>
+  </nav>
+  <div class="narrow-page">
+    <h2>Upload your bank statement</h2>
+    <p class="sub">PDF, Excel (.xlsx/.xls) or CSV. Processing happens locally in your browser — files are not uploaded to any server.</p>
+
+    <div class="dropzone" id="dropzone">
+      <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v13m0-13 4.5 4.5M12 3 7.5 7.5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+      <h3>Drop your bank statement here</h3>
+      <p>or <b style="color:var(--blue)">browse files</b> from your computer</p>
+      <div class="dz-formats">PDF · XLSX · CSV</div>
+      <input type="file" id="file-input" accept=".pdf,.xlsx,.xls,.csv" class="visually-hidden">
+    </div>
+
+    <div class="upload-or">or</div>
+    <div style="text-align:center"><button class="btn btn-secondary" id="demo-btn">Try Demo Statement (1,200 synthetic transactions)</button></div>
+
+    <div class="file-summary hidden" id="file-summary">
+      <div class="fico" id="file-ico">PDF</div>
+      <div class="fmeta">
+        <div class="fname" id="file-name">statement.pdf</div>
+        <div class="fdetail" id="file-detail">0 KB · Detected format: —</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="file-remove">Remove</button>
+    </div>
+
+    <div class="upload-actions">
+      <button class="btn btn-secondary" id="upload-cancel">Cancel</button>
+      <button class="btn btn-primary" id="start-analysis-btn" disabled>Start Analysis</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ SHEET SELECTION MODAL ============================================================ -->
+<div class="modal-backdrop" id="sheet-modal">
+  <div class="modal">
+    <h3>Select the statement sheet</h3>
+    <p class="modal-sub">This workbook has multiple sheets. Choose the one containing your transactions — BankLens has pre-selected the most likely candidate.</p>
+    <div id="sheet-list" style="margin-top:16px;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="sheet-cancel">Cancel</button>
+      <button class="btn btn-primary" id="sheet-confirm">Use this sheet</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ COLUMN MAPPING MODAL ============================================================ -->
+<div class="modal-backdrop" id="mapping-modal">
+  <div class="modal">
+    <h3>Confirm column mapping</h3>
+    <p class="modal-sub">BankLens detected these columns automatically. Please confirm or correct the mapping for required fields before continuing.</p>
+    <div id="mapping-rows"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mapping-cancel">Cancel</button>
+      <button class="btn btn-primary" id="mapping-confirm">Confirm &amp; Continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ PROCESSING PAGE ============================================================ -->
+<div id="page-processing" class="page hidden">
+  <div class="processing-wrap">
+    <div class="proc-ring"></div>
+    <h2 class="proc-title" id="proc-title">Analyzing your statement</h2>
+    <p class="proc-sub" id="proc-sub">Starting…</p>
+    <div class="proc-bar-track"><div class="proc-bar-fill" id="proc-bar"></div></div>
+    <div class="proc-steps" id="proc-steps"></div>
+  </div>
+</div>
+
+<!-- ============================================================ VERIFICATION PAGE ============================================================ -->
+<div id="page-verify" class="page hidden">
+  <div class="narrow-page" style="max-width:760px;">
+    <h2>Statement Verification</h2>
+    <p class="sub">Review what was extracted before relying on the analytics. Nothing has been modified or deleted from your original data.</p>
+    <div class="card" style="margin-top:26px;">
+      <div id="verify-grid" class="grid-2"></div>
+    </div>
+    <div class="card" id="verify-issues-card">
+      <div class="card-head"><h3>Potential issues</h3></div>
+      <div id="verify-issues"></div>
+    </div>
+    <div class="upload-actions">
+      <button class="btn btn-secondary" id="verify-back">Back to Upload</button>
+      <button class="btn btn-primary" id="verify-continue">Continue to Dashboard</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ APP SHELL ============================================================ -->
+<div class="app-shell" id="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" fill="none"><rect x="2" y="16" width="5" height="14" rx="1" fill="#3B6FE0"/><rect x="10" y="10" width="5" height="20" rx="1" fill="#fff"/><rect x="18" y="4" width="5" height="26" rx="1" fill="#3B6FE0"/><circle cx="26" cy="6" r="4.2" fill="none" stroke="#fff" stroke-width="2"/><line x1="29" y1="9" x2="31.5" y2="11.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+      BankLens
+    </div>
+    <div class="stmt-chip">
+      <div class="lbl">Statement</div>
+      <div class="val" id="chip-filename">demo_statement.csv</div>
+      <div class="lbl" style="margin-top:6px;">Period</div>
+      <div class="val" id="chip-period">—</div>
+    </div>
+    <div class="navgroup">
+      <div class="glabel">Overview</div>
+      <div class="navitem" data-view="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg> Analytics Dashboard</div>
+      <div class="navitem" data-view="insights"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/><circle cx="12" cy="12" r="4"/></svg> Management Insights</div>
+      <div class="glabel">Data</div>
+      <div class="navitem" data-view="transactions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M3 12h18M3 18h18"/></svg> Transactions</div>
+      <div class="navitem" data-view="reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg> Reports</div>
+      <div class="glabel">System</div>
+      <div class="navitem" data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z"/></svg> Settings</div>
+      <div class="navitem" id="new-statement-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg> New Statement</div>
+    </div>
+    <div class="sidebar-footer">BankLens — analytical prototype. Not financial, tax or legal advice.</div>
+  </aside>
+
+  <div class="main-area">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="menu-btn" id="menu-toggle">☰</button>
+        <h2 id="view-title">Analytics Dashboard</h2>
+      </div>
+      <div class="tb-actions">
+        <button class="btn btn-secondary btn-sm" id="tb-export-excel">Export Excel</button>
+        <button class="btn btn-primary btn-sm" id="tb-export-pdf">Export PDF Report</button>
+      </div>
+    </div>
+    <div class="content" id="content-root"></div>
+    <div class="app-footer">BankLens is an analytical prototype designed to assist financial review. Classification, extraction and anomaly detection may contain errors and should be reviewed by a qualified professional. It does not provide accounting, financial, tax or legal advice.</div>
+  </div>
+</div>
+
+<div id="toast-root"></div>
+
+<script>
+/* ================================================================
+   BANKLENS — application script
+   Modules: FILE HANDLER, PDF ENGINE, OCR ENGINE, EXCEL ENGINE,
+   DATA NORMALIZER, VALIDATION ENGINE, TRANSACTION TYPE ENGINE,
+   COUNTERPARTY ENGINE, CATEGORY ENGINE, ANALYTICS ENGINE,
+   INSIGHT ENGINE, DASHBOARD ENGINE, CHART ENGINE, EXPORT ENGINE,
+   PDF REPORT ENGINE, UI ENGINE, LOCAL STORAGE
+   ================================================================ */
+
+if (window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+/* ---------------- LOCAL STORAGE MODULE ---------------- */
+const LocalStore = {
+  KEY_MAP: 'banklens_category_map',
+  KEY_SETTINGS: 'banklens_settings',
+  getCategoryMap(){ try{ return JSON.parse(localStorage.getItem(this.KEY_MAP)) || {}; }catch(e){ return {}; } },
+  setCategoryMap(map){ try{ localStorage.setItem(this.KEY_MAP, JSON.stringify(map)); }catch(e){} },
+  addMapping(key, category){
+    const m = this.getCategoryMap();
+    m[key.trim().toUpperCase()] = category;
+    this.setCategoryMap(m);
+  },
+  removeMapping(key){
+    const m = this.getCategoryMap();
+    delete m[key];
+    this.setCategoryMap(m);
+  },
+  getSettings(){
+    try{ return Object.assign({currency:'INR', dateFormat:'DD-MM-YYYY', unusualThreshold:3}, JSON.parse(localStorage.getItem(this.KEY_SETTINGS))||{}); }
+    catch(e){ return {currency:'INR', dateFormat:'DD-MM-YYYY', unusualThreshold:3}; }
+  },
+  setSettings(s){ try{ localStorage.setItem(this.KEY_SETTINGS, JSON.stringify(s)); }catch(e){} }
+};
+
+/* ---------------- APP STATE ---------------- */
+const State = {
+  fileMeta: null,          // {name, size, type, format}
+  rawWorkbook: null,       // parsed workbook (excel/csv)
+  selectedSheet: null,
+  headerRow: [],
+  dataRows: [],
+  mapping: {},             // standardField -> raw header
+  mappingConfidence: {},
+  pdfExtraction: null,     // {lines, method, pages}
+  transactions: [],        // normalized final
+  filtered: [],
+  settings: LocalStore.getSettings(),
+  currentView: 'dashboard',
+  txPage: 1,
+  txPageSize: 50,
+  filters: { from:null, to:null, direction:'all', type:'all', category:'all', counterparty:'', status:'all' },
+  currencySymbols: {INR:'₹', USD:'$', EUR:'€', GBP:'£'}
+};
+
+/* ---------------- UTILS ---------------- */
+const Utils = {
+  uid(){ return 'tx' + Math.random().toString(36).slice(2,10) + Date.now().toString(36); },
+  fmtBytes(b){
+    if (b < 1024) return b + ' B';
+    if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+    return (b/(1024*1024)).toFixed(2) + ' MB';
+  },
+  sym(){ return State.currencySymbols[State.settings.currency] || '₹'; },
+  fmtMoney(n, compact){
+    if (n === null || n === undefined || isNaN(n)) return this.sym() + '0';
+    const s = this.sym();
+    const abs = Math.abs(n);
+    if (compact) {
+      if (abs >= 1e7) return (n<0?'-':'') + s + (abs/1e7).toFixed(2) + ' Cr';
+      if (abs >= 1e5) return (n<0?'-':'') + s + (abs/1e5).toFixed(2) + ' L';
+      if (abs >= 1e3) return (n<0?'-':'') + s + (abs/1e3).toFixed(1) + 'K';
+      return (n<0?'-':'') + s + abs.toFixed(0);
+    }
+    return (n<0?'-':'') + s + abs.toLocaleString('en-IN', {maximumFractionDigits:2});
+  },
+  fmtDate(d){
+    if (!d || !(d instanceof Date) || isNaN(d)) return '—';
+    const fmt = State.settings.dateFormat;
+    const dd = String(d.getDate()).padStart(2,'0');
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const yyyy = d.getFullYear();
+    if (fmt === 'MM-DD-YYYY') return `${mm}-${dd}-${yyyy}`;
+    if (fmt === 'YYYY-MM-DD') return `${yyyy}-${mm}-${dd}`;
+    return `${dd}-${mm}-${yyyy}`;
+  },
+  monthKey(d){ return d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` : 'Unknown'; },
+  monthLabel(key){
+    if (key === 'Unknown') return 'Unknown';
+    const [y,m] = key.split('-');
+    const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return names[parseInt(m,10)-1] + ' ' + y;
+  },
+  parseDate(v){
+    if (v === null || v === undefined || v === '') return null;
+    if (v instanceof Date && !isNaN(v)) return v;
+    if (typeof v === 'number') {
+      // excel serial date
+      const d = new Date(Math.round((v - 25569) * 86400 * 1000));
+      if (!isNaN(d)) return d;
+    }
+    const str = String(v).trim();
+    if (!str) return null;
+    // try common patterns dd-mm-yyyy, dd/mm/yyyy, yyyy-mm-dd, mm/dd/yyyy
+    let m;
+    if ((m = str.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/))) {
+      return new Date(+m[1], +m[2]-1, +m[3]);
+    }
+    if ((m = str.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})$/))) {
+      let yy = +m[3]; if (yy < 100) yy += 2000;
+      let dd = +m[1], mo = +m[2];
+      if (dd > 12) return new Date(yy, mo-1, dd);
+      return new Date(yy, mo-1, dd); // assume DD-MM-YYYY default per bank convention
+    }
+    if ((m = str.match(/^(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{2,4})$/))) {
+      const months = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+      const mo = months[m[2].slice(0,3).toLowerCase()];
+      if (mo !== undefined) { let yy=+m[3]; if(yy<100) yy+=2000; return new Date(yy, mo, +m[1]); }
+    }
+    const d2 = new Date(str);
+    if (!isNaN(d2)) return d2;
+    return null;
+  },
+  parseNumber(v){
+    if (v === null || v === undefined || v === '') return null;
+    if (typeof v === 'number') return v;
+    let s = String(v).trim();
+    if (!s || s === '-') return null;
+    let neg = false;
+    if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1,-1); }
+    s = s.replace(/[,₹$€£\s]/g,'');
+    if (s.toUpperCase().endsWith('DR')) { neg = true; s = s.slice(0,-2); }
+    if (s.toUpperCase().endsWith('CR')) { s = s.slice(0,-2); }
+    const n = parseFloat(s);
+    if (isNaN(n)) return null;
+    return neg ? -Math.abs(n) : n;
+  },
+  escapeHtml(s){ return String(s===undefined||s===null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); },
+  toast(msg){
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.innerHTML = `<span>✓</span><span>${this.escapeHtml(msg)}</span>`;
+    document.getElementById('toast-root').appendChild(el);
+    setTimeout(()=>el.remove(), 3200);
+  },
+  debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+};
+</script>
+<script>
+/* ================== FILE HANDLER ================== */
+const FileHandler = {
+  pendingFile: null,
+  init(){
+    const dz = document.getElementById('dropzone');
+    const input = document.getElementById('file-input');
+    dz.addEventListener('click', ()=> input.click());
+    dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('drag'); });
+    dz.addEventListener('dragleave', ()=> dz.classList.remove('drag'));
+    dz.addEventListener('drop', e=>{
+      e.preventDefault(); dz.classList.remove('drag');
+      if (e.dataTransfer.files.length) this.setFile(e.dataTransfer.files[0]);
+    });
+    input.addEventListener('change', e=>{
+      if (e.target.files.length) this.setFile(e.target.files[0]);
+    });
+    document.getElementById('file-remove').addEventListener('click', ()=> this.clearFile());
+    document.getElementById('start-analysis-btn').addEventListener('click', ()=> this.startAnalysis());
+    document.getElementById('demo-btn').addEventListener('click', ()=> this.startDemo());
+  },
+  setFile(file){
+    const name = file.name;
+    const ext = name.split('.').pop().toLowerCase();
+    let format = 'unknown';
+    if (ext === 'pdf') format = 'PDF';
+    else if (['xlsx','xls'].includes(ext)) format = 'Excel';
+    else if (ext === 'csv') format = 'CSV';
+    else { Utils.toast('Unsupported file type. Please upload PDF, XLSX or CSV.'); return; }
+    this.pendingFile = file;
+    State.fileMeta = { name, size: file.size, type: file.type, format, ext };
+    document.getElementById('file-ico').textContent = ext.toUpperCase().slice(0,3);
+    document.getElementById('file-name').textContent = name;
+    document.getElementById('file-detail').textContent = `${Utils.fmtBytes(file.size)} · Detected format: ${format}`;
+    document.getElementById('file-summary').classList.remove('hidden');
+    document.getElementById('start-analysis-btn').disabled = false;
+  },
+  clearFile(){
+    this.pendingFile = null; State.fileMeta = null;
+    document.getElementById('file-summary').classList.add('hidden');
+    document.getElementById('start-analysis-btn').disabled = true;
+    document.getElementById('file-input').value = '';
+  },
+  startDemo(){
+    UIEngine.showPage('processing');
+    ProcessingUI.run('demo');
+  },
+  startAnalysis(){
+    if (!this.pendingFile) return;
+    UIEngine.showPage('processing');
+    ProcessingUI.run('file', this.pendingFile);
+  }
+};
+
+/* ================== EXCEL / CSV ENGINE ================== */
+const ExcelEngine = {
+  async parse(file){
+    const ext = State.fileMeta.ext;
+    let workbook;
+    if (ext === 'csv') {
+      const text = await file.text();
+      workbook = XLSX.read(text, { type: 'string' });
+    } else {
+      const buf = await file.arrayBuffer();
+      workbook = XLSX.read(buf, { type: 'array', cellDates: true });
+    }
+    State.rawWorkbook = workbook;
+    return workbook;
+  },
+  sheetScore(ws){
+    // heuristic: rows count + presence of date-like & amount-like headers
+    const rows = XLSX.utils.sheet_to_json(ws, { header:1, raw:true, defval:'' });
+    if (!rows.length) return { score:0, rows };
+    let headerRowIdx = 0;
+    // find first row with >=3 non-empty cells as header
+    for (let i=0;i<Math.min(rows.length,5);i++){
+      if (rows[i].filter(c=>String(c).trim()!=='').length >= 3) { headerRowIdx = i; break; }
+    }
+    const header = (rows[headerRowIdx]||[]).map(h=>String(h||'').toLowerCase());
+    const kw = ['date','narration','description','particular','debit','credit','withdrawal','deposit','balance','amount','remark'];
+    let hits = 0;
+    header.forEach(h=> kw.forEach(k=>{ if (h.includes(k)) hits++; }));
+    const dataRows = rows.length - headerRowIdx - 1;
+    return { score: hits*100 + dataRows, rows, headerRowIdx, dataRows };
+  },
+  chooseBestSheet(workbook){
+    let best = null, bestName = null;
+    workbook.SheetNames.forEach(name=>{
+      const info = this.sheetScore(workbook.Sheets[name]);
+      if (!best || info.score > best.score) { best = info; bestName = name; }
+    });
+    return bestName;
+  }
+};
+
+/* ================== FIELD DICTIONARY / NORMALIZER ================== */
+const FieldDict = {
+  date: ['date','transaction date','txn date','value date','posting date'],
+  description: ['description','narration','transaction details','particulars','remarks','details','narrative'],
+  debit: ['debit','withdrawal','withdrawal amount','debit amount','dr'],
+  credit: ['credit','deposit','deposit amount','credit amount','cr'],
+  balance: ['balance','closing balance','available balance','running balance'],
+  amount: ['amount','transaction amount','txn amount'],
+  reference: ['reference','ref no','reference number','cheque no','chq no','transaction id','txn id','utr']
+};
+const DataNormalizer = {
+  detectMapping(headerRow){
+    const mapping = {}; const confidence = {};
+    const norm = headerRow.map(h=>String(h||'').trim().toLowerCase());
+    Object.keys(FieldDict).forEach(field=>{
+      let bestIdx=-1, bestConf=0;
+      norm.forEach((h,i)=>{
+        if (!h) return;
+        FieldDict[field].forEach(cand=>{
+          if (h === cand) { if (95>bestConf){bestConf=95;bestIdx=i;} }
+          else if (h.includes(cand) || cand.includes(h)) { if (70>bestConf){bestConf=70;bestIdx=i;} }
+        });
+      });
+      if (bestIdx>=0) { mapping[field]=headerRow[bestIdx]; confidence[field]=bestConf; }
+    });
+    return { mapping, confidence };
+  },
+  confidenceLevel(v){ if (v>=90) return 'high'; if (v>=60) return 'medium'; return 'low'; },
+  buildRowsFromMapping(rows, headerRow, mapping){
+    const idx = {};
+    Object.keys(mapping).forEach(f=>{ idx[f] = headerRow.indexOf(mapping[f]); });
+    return rows.map((r,i)=>{
+      const get = f => idx[f]>=0 ? r[idx[f]] : undefined;
+      return {
+        _rowNum: i,
+        dateRaw: get('date'),
+        description: get('description'),
+        debitRaw: get('debit'),
+        creditRaw: get('credit'),
+        amountRaw: get('amount'),
+        balanceRaw: get('balance'),
+        referenceRaw: get('reference')
+      };
+    });
+  },
+  normalize(rawRows, sourceType, sourcePageOrRow){
+    const catMap = LocalStore.getCategoryMap();
+    const out = [];
+    rawRows.forEach((r, i)=>{
+      const date = Utils.parseDate(r.dateRaw);
+      let debit = Utils.parseNumber(r.debitRaw);
+      let credit = Utils.parseNumber(r.creditRaw);
+      const amount = Utils.parseNumber(r.amountRaw);
+      if ((debit===null && credit===null) && amount!==null) {
+        if (amount < 0) debit = Math.abs(amount); else credit = amount;
+      }
+      const balance = Utils.parseNumber(r.balanceRaw);
+      const description = (r.description===undefined||r.description===null) ? '' : String(r.description).trim();
+      const issues = [];
+      if (!date) issues.push('Missing or unparseable date');
+      if (!description) issues.push('Missing description');
+      if (debit===null && credit===null) issues.push('No valid debit/credit amount');
+      if (debit!==null && credit!==null && debit>0 && credit>0) issues.push('Both debit and credit present');
+
+      const typeInfo = TransactionTypeEngine.detect(description);
+      const counterparty = CounterpartyEngine.detect(description, typeInfo);
+      const catInfo = CategoryEngine.classify(description, typeInfo, counterparty, debit, credit, catMap);
+
+      out.push({
+        id: Utils.uid(),
+        date, dateRaw: r.dateRaw,
+        description: description || '(no description)',
+        transactionType: typeInfo.type,
+        counterparty: counterparty.name,
+        counterpartyConfidence: counterparty.confidence,
+        referenceNumber: (r.referenceRaw!==undefined && r.referenceRaw!==null && r.referenceRaw!=='') ? String(r.referenceRaw) : (typeInfo.reference || ''),
+        debit: debit && debit>0 ? debit : 0,
+        credit: credit && credit>0 ? credit : 0,
+        balance,
+        category: catInfo.category,
+        confidence: catInfo.confidence,
+        status: issues.length ? 'review' : 'valid',
+        issues,
+        sourcePage: sourceType==='pdf' ? sourcePageOrRow : null,
+        sourceRow: sourceType!=='pdf' ? (r._rowNum!==undefined? r._rowNum+2 : i+2) : null,
+        sourceType
+      });
+    });
+    return out;
+  }
+};
+</script>
+<script>
+/* ================== TRANSACTION TYPE ENGINE ================== */
+const TransactionTypeEngine = {
+  patterns: [
+    ['NEFT', /\bNEFT\b/i], ['RTGS', /\bRTGS\b/i], ['IMPS', /\bIMPS\b/i], ['UPI', /\bUPI\b/i],
+    ['ATM', /\bATM\b/i], ['POS', /\bPOS\b/i], ['CHEQUE', /\bCHQ\b|\bCHEQUE\b/i], ['CASH', /\bCASH\b/i],
+    ['ECS', /\bECS\b/i], ['NACH', /\bNACH\b/i], ['EMI', /\bEMI\b/i], ['BANK CHARGE', /\bCHG\b|\bCHARGE\b|\bMAB\b/i],
+    ['TRANSFER', /\bTRANSFER\b|\bTRF\b/i]
+  ],
+  detect(description){
+    const d = description || '';
+    for (const [type, re] of this.patterns){
+      if (re.test(d)) {
+        // try to extract reference from slash-delimited narration e.g. NEFT/NAME/REF123
+        const parts = d.split(/[\/\-]/).map(p=>p.trim()).filter(Boolean);
+        let reference = '';
+        if (parts.length > 2) reference = parts[parts.length-1];
+        return { type, reference };
+      }
+    }
+    return { type: 'OTHER', reference:'' };
+  }
+};
+
+/* ================== COUNTERPARTY ENGINE ================== */
+const CounterpartyEngine = {
+  detect(description, typeInfo){
+    const d = (description||'').trim();
+    if (!d) return { name:'Unknown', confidence: 20 };
+    // slash-delimited: NEFT/ABC TRADERS/REF123 -> take middle-ish token that's alphabetic
+    const slashParts = d.split(/[\/]/).map(p=>p.trim()).filter(Boolean);
+    if (slashParts.length >= 2) {
+      const candidate = slashParts.find((p,i)=> i>0 && /[A-Za-z]{3,}/.test(p) && !/^\d+$/.test(p));
+      if (candidate) return { name: this.clean(candidate), confidence: 75 };
+    }
+    // dash-delimited: UPI-ABC TRADERS-REF-BANK
+    const dashParts = d.split(/[\-]/).map(p=>p.trim()).filter(Boolean);
+    if (dashParts.length >= 2) {
+      const candidate = dashParts.find((p,i)=> i>0 && /[A-Za-z]{3,}/.test(p) && !/^\d+$/.test(p));
+      if (candidate) return { name: this.clean(candidate), confidence: 60 };
+    }
+    // fallback: strip known type keywords and numbers, use remaining text
+    let cleaned = d.replace(/\bNEFT\b|\bRTGS\b|\bIMPS\b|\bUPI\b|\bATM\b|\bPOS\b|\bCHQ\b|\bCHEQUE\b|\bECS\b|\bNACH\b|\bEMI\b|\bTRANSFER\b|\bTRF\b/gi,'')
+                     .replace(/\b\d{6,}\b/g,'').replace(/[\/\-]/g,' ').replace(/\s+/g,' ').trim();
+    if (cleaned.length >= 3) return { name: this.clean(cleaned), confidence: 40 };
+    return { name:'Unknown', confidence: 20 };
+  },
+  clean(s){
+    return s.replace(/[^A-Za-z0-9&.\s]/g,'').trim().replace(/\s+/g,' ').slice(0,40) || 'Unknown';
+  }
+};
+
+/* ================== CATEGORY ENGINE ================== */
+const CategoryEngine = {
+  rules: [
+    ['Salary', /\bSALARY\b|\bSAL\b|\bPAYROLL\b/i],
+    ['Rent', /\bRENT\b/i],
+    ['Utilities', /\bELECTRIC|ELECTRICITY|WATER BILL|GAS BILL|BROADBAND|INTERNET BILL|MOBILE BILL|UTILITY\b/i],
+    ['Taxes', /\bGST\b|\bTDS\b|\bINCOME TAX\b|\bTAX\b/i],
+    ['Bank Charges', /\bCHG\b|\bCHARGE\b|\bMAB\b|\bSMS CHARGE\b|\bAMC\b/i],
+    ['Interest Paid', /\bINTEREST DEBIT\b|\bINT\.?\s*DR\b|\bLOAN INTEREST\b/i],
+    ['Interest Received', /\bINTEREST CREDIT\b|\bINT\.?\s*CR\b|\bSAVINGS INTEREST\b/i],
+    ['Penalties', /\bPENALTY\b|\bFINE\b|\bLATE FEE\b|\bBOUNCE\b/i],
+    ['Loan / EMI', /\bEMI\b|\bLOAN\b/i],
+    ['Cash Withdrawal', /\bATM\b|\bCASH WDL\b|\bCASH WITHDRAWAL\b/i],
+    ['Travel', /\bUBER\b|\bOLA\b|\bIRCTC\b|\bAIRLINES?\b|\bFLIGHT\b|\bTRAVEL\b/i],
+    ['Marketing', /\bMARKETING\b|\bADVERT|\bGOOGLE ADS\b|\bFACEBOOK ADS\b/i],
+    ['Office Expenses', /\bOFFICE\b|\bSTATIONERY\b|\bCOURIER\b/i],
+    ['Service Charges', /\bSERVICE CHARGE\b|\bPROCESSING FEE\b/i],
+    ['Transfers', /\bTRANSFER\b|\bTRF\b|\bOWN A\/C\b/i],
+    ['Vendor Payments', /\bVENDOR\b|\bSUPPLIER\b|\bTRADERS\b|\bENTERPRISES\b|\bIMPEX\b/i],
+    ['Purchases', /\bPURCHASE\b/i],
+    ['Customer Receipts', /\bCUSTOMER\b|\bCLIENT\b|\bINVOICE\b/i],
+    ['Sales Receipts', /\bSALES\b|\bSALE\b/i],
+    ['Refunds', /\bREFUND\b|\bREVERSAL\b/i]
+  ],
+  classify(description, typeInfo, counterparty, debit, credit, catMap){
+    const d = (description||'').toUpperCase();
+    const key = (counterparty && counterparty.name && counterparty.name!=='Unknown') ? counterparty.name.toUpperCase() : null;
+    if (key && catMap && catMap[key]) {
+      return { category: catMap[key], confidence: 98 };
+    }
+    for (const [cat, re] of this.rules) {
+      if (re.test(d)) return { category: cat, confidence: 80 };
+    }
+    if (typeInfo.type === 'BANK CHARGE') return { category:'Bank Charges', confidence:70 };
+    if (typeInfo.type === 'ATM') return { category:'Cash Withdrawal', confidence:70 };
+    // fallback by direction with low confidence generic bucket
+    if (credit>0 && debit===0) return { category:'Other Receipts', confidence:30 };
+    if (debit>0 && credit===0) return { category:'Other', confidence:30 };
+    return { category:'Unclassified', confidence:15 };
+  }
+};
+
+/* ================== PDF ENGINE ================== */
+const PdfEngine = {
+  // heuristic line parser: looks for a date token + at least one numeric amount in a text line
+  DATE_RE: /\b(\d{1,2}[-\/][A-Za-z]{3}[-\/]\d{2,4}|\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}|\d{4}[-\/]\d{1,2}[-\/]\d{1,2})\b/,
+  AMOUNT_RE: /-?\(?\d[\d,]*\.\d{2}\)?/g,
+  async extract(file, onProgress){
+    const buf = await file.arrayBuffer();
+    let pdf;
+    try {
+      pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    } catch(e) {
+      throw new Error('PASSWORD_OR_CORRUPT');
+    }
+    const totalPages = pdf.numPages;
+    let allText = [];
+    let totalChars = 0;
+    for (let p=1; p<=totalPages; p++){
+      onProgress && onProgress(p, totalPages, 'reading');
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      const strs = content.items.map(it=>it.str);
+      const pageText = strs.join(' ');
+      totalChars += pageText.replace(/\s/g,'').length;
+      allText.push({ page:p, text: strs, raw: pageText });
+    }
+    const avgCharsPerPage = totalChars / totalPages;
+    const isDigital = avgCharsPerPage > 60; // heuristic threshold
+    if (isDigital) {
+      return { method:'text', pages: totalPages, data: allText };
+    }
+    // fall back to OCR
+    return { method:'ocr-needed', pages: totalPages, pdfDoc: pdf };
+  },
+  linesFromPageItems(items){
+    // group text items into lines by y coordinate proximity using PDF.js content items with transform
+    return items; // items already strings; row grouping handled at extraction via textContent order (approx)
+  },
+  parseRowsFromText(pageTextEntries){
+    // Build row-like records by scanning raw text per page for date+amount patterns.
+    // Since pdf.js text content loses strict row structure for complex tables, we use a best-effort
+    // approach: split on the extracted string stream by locating date occurrences.
+    const rows = [];
+    pageTextEntries.forEach(entry=>{
+      const text = entry.raw;
+      // split into chunks starting at each date occurrence
+      const dateMatches = [...text.matchAll(new RegExp(this.DATE_RE.source,'g'))];
+      for (let i=0;i<dateMatches.length;i++){
+        const start = dateMatches[i].index;
+        const end = i+1<dateMatches.length ? dateMatches[i+1].index : text.length;
+        const chunk = text.slice(start, end).trim();
+        const dateStr = dateMatches[i][0];
+        const amounts = chunk.match(this.AMOUNT_RE) || [];
+        const description = chunk.replace(this.DATE_RE, '').replace(this.AMOUNT_RE,'').trim();
+        rows.push({
+          _rowNum: rows.length,
+          dateRaw: dateStr,
+          description: description.slice(0,140),
+          debitRaw: null,
+          creditRaw: null,
+          amountRaw: amounts.length ? amounts[amounts.length>1?0:0] : null,
+          balanceRaw: amounts.length>1 ? amounts[amounts.length-1] : null,
+          referenceRaw: null,
+          _page: entry.page,
+          _lowConfidence: true
+        });
+      }
+    });
+    return rows;
+  }
+};
+
+/* ================== OCR ENGINE ================== */
+const OcrEngine = {
+  async run(pdfDoc, onProgress){
+    const totalPages = pdfDoc.numPages;
+    const entries = [];
+    let worker;
+    worker = await Tesseract.createWorker('eng', 1, {
+      logger: m => {
+        if (m.status === 'recognizing text' && onProgress) onProgress(m.progress);
+      }
+    });
+    for (let p=1;p<=totalPages;p++){
+      const page = await pdfDoc.getPage(p);
+      const viewport = page.getViewport({ scale: 2 });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width; canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d');
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      const { data } = await worker.recognize(canvas);
+      entries.push({ page:p, raw: data.text, confidence: data.confidence });
+    }
+    await worker.terminate();
+    return entries;
+  }
+};
+</script>
+<script>
+/* ================== VALIDATION ENGINE ================== */
+const ValidationEngine = {
+  run(transactions){
+    const seenRefs = {};
+    const stats = { total: transactions.length, missingDates:0, invalidDebitCredit:0, missingDesc:0, duplicateRefs:0, balanceExceptions:0 };
+    // duplicate reference detection
+    transactions.forEach(t=>{
+      if (t.referenceNumber) {
+        seenRefs[t.referenceNumber] = (seenRefs[t.referenceNumber]||0)+1;
+      }
+    });
+    // sort by date for balance consistency check
+    const withBalance = transactions.filter(t=>t.balance!==null && t.balance!==undefined && t.date);
+    withBalance.sort((a,b)=> a.date - b.date);
+    for (let i=1;i<withBalance.length;i++){
+      const prev = withBalance[i-1], cur = withBalance[i];
+      const expected = prev.balance + cur.credit - cur.debit;
+      if (Math.abs(expected - cur.balance) > 1.0) {
+        cur.issues.push(`Balance inconsistency: expected ${expected.toFixed(2)}, statement shows ${cur.balance.toFixed(2)}`);
+        cur.status = 'exception';
+        stats.balanceExceptions++;
+      }
+    }
+    transactions.forEach(t=>{
+      if (!t.date) stats.missingDates++;
+      if (t.debit===0 && t.credit===0) stats.invalidDebitCredit++;
+      if (!t.description || t.description==='(no description)') stats.missingDesc++;
+      if (t.referenceNumber && seenRefs[t.referenceNumber] > 1) {
+        if (!t.issues.some(i=>i.includes('Duplicate reference'))) t.issues.push('Duplicate reference number: ' + t.referenceNumber);
+        if (t.status === 'valid') t.status = 'review';
+      }
+      if (t.issues.length && t.status === 'valid') t.status = 'review';
+    });
+    stats.duplicateRefs = Object.values(seenRefs).filter(c=>c>1).length;
+    stats.exceptions = transactions.filter(t=>t.status==='exception').length;
+    stats.needsReview = transactions.filter(t=>t.status==='review').length;
+    stats.unclassified = transactions.filter(t=>t.category==='Unclassified').length;
+    return stats;
+  }
+};
+
+/* ================== ANALYTICS ENGINE ================== */
+const AnalyticsEngine = {
+  compute(transactions){
+    const A = {};
+    A.totalCount = transactions.length;
+    A.debitCount = transactions.filter(t=>t.debit>0).length;
+    A.creditCount = transactions.filter(t=>t.credit>0).length;
+    A.totalInflow = transactions.reduce((s,t)=>s+t.credit,0);
+    A.totalOutflow = transactions.reduce((s,t)=>s+t.debit,0);
+    A.netMovement = A.totalInflow - A.totalOutflow;
+
+    const withBal = transactions.filter(t=>t.balance!==null && t.balance!==undefined && t.date).sort((a,b)=>a.date-b.date);
+    A.openingBalance = withBal.length ? withBal[0].balance - withBal[0].credit + withBal[0].debit : null;
+    A.closingBalance = withBal.length ? withBal[withBal.length-1].balance : null;
+    A.avgBalance = withBal.length ? withBal.reduce((s,t)=>s+t.balance,0)/withBal.length : null;
+    A.balanceDelta = (A.openingBalance!==null && A.closingBalance!==null) ? (A.closingBalance - A.openingBalance) : null;
+    A.balanceMismatch = (A.balanceDelta!==null) ? Math.abs(A.balanceDelta - A.netMovement) > Math.max(1, A.totalInflow*0.001) : false;
+
+    const credits = transactions.filter(t=>t.credit>0);
+    const debits = transactions.filter(t=>t.debit>0);
+    A.highestInflowTx = credits.reduce((m,t)=> (!m||t.credit>m.credit)?t:m, null);
+    A.highestOutflowTx = debits.reduce((m,t)=> (!m||t.debit>m.debit)?t:m, null);
+
+    // bank charges / interest / penalties
+    const sumCat = c => transactions.filter(t=>t.category===c).reduce((s,t)=>s+t.debit+t.credit,0);
+    const cntCat = c => transactions.filter(t=>t.category===c).length;
+    A.bankCharges = { total: sumCat('Bank Charges'), count: cntCat('Bank Charges') };
+    A.interestPaid = { total: sumCat('Interest Paid'), count: cntCat('Interest Paid') };
+    A.interestReceived = { total: sumCat('Interest Received'), count: cntCat('Interest Received') };
+    A.penalties = { total: sumCat('Penalties'), count: cntCat('Penalties') };
+
+    // monthly
+    const monthMap = {};
+    transactions.forEach(t=>{
+      const k = Utils.monthKey(t.date);
+      if (!monthMap[k]) monthMap[k] = { key:k, inflow:0, outflow:0 };
+      monthMap[k].inflow += t.credit; monthMap[k].outflow += t.debit;
+    });
+    A.monthly = Object.values(monthMap).filter(m=>m.key!=='Unknown').sort((a,b)=>a.key.localeCompare(b.key))
+      .map(m=>({ ...m, net: m.inflow - m.outflow, label: Utils.monthLabel(m.key) }));
+    if (A.monthly.length){
+      A.highestInflowMonth = A.monthly.reduce((m,x)=>x.inflow>m.inflow?x:m);
+      A.highestOutflowMonth = A.monthly.reduce((m,x)=>x.outflow>m.outflow?x:m);
+      A.lowestInflowMonth = A.monthly.reduce((m,x)=>x.inflow<m.inflow?x:m);
+      A.lowestOutflowMonth = A.monthly.reduce((m,x)=>x.outflow<m.outflow?x:m);
+      A.bestNetMonth = A.monthly.reduce((m,x)=>x.net>m.net?x:m);
+      A.worstNetMonth = A.monthly.reduce((m,x)=>x.net<m.net?x:m);
+    }
+
+    // transaction type breakdown
+    const typeMap = {};
+    transactions.forEach(t=>{
+      if (!typeMap[t.transactionType]) typeMap[t.transactionType] = { type:t.transactionType, count:0, value:0 };
+      typeMap[t.transactionType].count++; typeMap[t.transactionType].value += (t.debit+t.credit);
+    });
+    A.byType = Object.values(typeMap).sort((a,b)=>b.value-a.value);
+
+    // category breakdown (outflow)
+    const catOut = {};
+    transactions.filter(t=>t.debit>0).forEach(t=>{
+      catOut[t.category] = (catOut[t.category]||0) + t.debit;
+    });
+    A.categoryOutflow = Object.entries(catOut).map(([category,total])=>({category,total})).sort((a,b)=>b.total-a.total);
+    const catIn = {};
+    transactions.filter(t=>t.credit>0).forEach(t=>{ catIn[t.category] = (catIn[t.category]||0)+t.credit; });
+    A.categoryInflow = Object.entries(catIn).map(([category,total])=>({category,total})).sort((a,b)=>b.total-a.total);
+
+    // top payment recipients (debit grouped by counterparty)
+    const payMap = {}, recMap = {};
+    transactions.forEach(t=>{
+      if (t.debit>0){
+        const k = t.counterparty || 'Unknown';
+        if (!payMap[k]) payMap[k] = { counterparty:k, count:0, total:0, largest:0 };
+        payMap[k].count++; payMap[k].total += t.debit; payMap[k].largest = Math.max(payMap[k].largest, t.debit);
+      }
+      if (t.credit>0){
+        const k = t.counterparty || 'Unknown';
+        if (!recMap[k]) recMap[k] = { counterparty:k, count:0, total:0, largest:0 };
+        recMap[k].count++; recMap[k].total += t.credit; recMap[k].largest = Math.max(recMap[k].largest, t.credit);
+      }
+    });
+    A.topPayees = Object.values(payMap).map(p=>({...p, avg:p.total/p.count})).sort((a,b)=>b.total-a.total).slice(0,10);
+    A.topPayers = Object.values(recMap).map(p=>({...p, avg:p.total/p.count})).sort((a,b)=>b.total-a.total).slice(0,10);
+
+    A.largestPayments = [...debits].sort((a,b)=>b.debit-a.debit).slice(0,10);
+    A.largestReceipts = [...credits].sort((a,b)=>b.credit-a.credit).slice(0,10);
+
+    // recurring detection: group by counterparty, look for repeated similar amounts across multiple months
+    const recurGroups = {};
+    transactions.forEach(t=>{
+      if (!t.counterparty || t.counterparty==='Unknown' || !t.date) return;
+      const k = t.counterparty;
+      if (!recurGroups[k]) recurGroups[k] = [];
+      recurGroups[k].push(t);
+    });
+    A.recurring = [];
+    Object.entries(recurGroups).forEach(([cp, txs])=>{
+      if (txs.length < 3) return;
+      const months = new Set(txs.map(t=>Utils.monthKey(t.date)));
+      if (months.size < 3) return;
+      const amounts = txs.map(t=>t.debit||t.credit);
+      const avg = amounts.reduce((s,a)=>s+a,0)/amounts.length;
+      const variance = amounts.every(a=> Math.abs(a-avg) <= avg*0.15);
+      if (variance) {
+        A.recurring.push({ counterparty:cp, count:txs.length, avgAmount:avg, months: months.size, direction: txs[0].debit>0?'outflow':'inflow', category: txs[0].category });
+      }
+    });
+    A.recurring.sort((a,b)=>b.count-a.count);
+
+    // unusual transactions: > threshold x category avg or counterparty avg
+    const threshold = State.settings.unusualThreshold || 3;
+    const catAvg = {};
+    transactions.forEach(t=>{
+      const amt = t.debit||t.credit; if (!amt) return;
+      if (!catAvg[t.category]) catAvg[t.category] = [];
+      catAvg[t.category].push(amt);
+    });
+    const catAvgMap = {};
+    Object.entries(catAvg).forEach(([c,arr])=>{ catAvgMap[c] = arr.reduce((s,a)=>s+a,0)/arr.length; });
+    A.unusual = [];
+    transactions.forEach(t=>{
+      const amt = t.debit||t.credit; if (!amt) return;
+      const avg = catAvgMap[t.category];
+      if (avg && amt > avg*threshold && avg>0) {
+        A.unusual.push({ tx:t, ratio: amt/avg, reason: `Amount is ${(amt/avg).toFixed(1)}× the average for "${t.category}" transactions.` });
+      }
+    });
+    A.unusual.sort((a,b)=>b.ratio-a.ratio);
+
+    return A;
+  }
+};
+
+/* ================== INSIGHT ENGINE ================== */
+const InsightEngine = {
+  generate(A, transactions){
+    const insights = [];
+    const s = Utils.sym();
+    if (A.monthly && A.monthly.length){
+      const worst = A.worstNetMonth, best = A.bestNetMonth;
+      if (worst && worst.net < 0) insights.push(`Outflow exceeded inflow in ${worst.label} by ${Utils.fmtMoney(Math.abs(worst.net), true)}.`);
+      if (best) insights.push(`${best.label} recorded the strongest net cash position at ${Utils.fmtMoney(best.net,true)}.`);
+      if (A.highestInflowMonth) insights.push(`${A.highestInflowMonth.label} recorded the highest cash inflow at ${Utils.fmtMoney(A.highestInflowMonth.inflow,true)}.`);
+      if (A.highestOutflowMonth) insights.push(`${A.highestOutflowMonth.label} recorded the highest cash outflow at ${Utils.fmtMoney(A.highestOutflowMonth.outflow,true)}.`);
+    }
+    if (A.categoryOutflow && A.categoryOutflow.length){
+      const top = A.categoryOutflow[0];
+      const pct = A.totalOutflow ? (top.total/A.totalOutflow*100).toFixed(1) : 0;
+      insights.push(`${top.category} represented ${pct}% of total cash outflow (${Utils.fmtMoney(top.total,true)}).`);
+    }
+    if (A.topPayees && A.topPayees.length){
+      const top = A.topPayees[0];
+      insights.push(`${top.counterparty} received the highest cumulative payment of ${Utils.fmtMoney(top.total,true)} across ${top.count} transactions.`);
+    }
+    if (A.topPayers && A.topPayers.length){
+      const top = A.topPayers[0];
+      insights.push(`${top.counterparty} was the largest receipt source, contributing ${Utils.fmtMoney(top.total,true)}.`);
+    }
+    if (A.byType && A.byType.length){
+      const totalCount = transactions.length, totalValue = A.totalInflow + A.totalOutflow;
+      const top = [...A.byType].sort((a,b)=>b.count-a.count)[0];
+      if (top && totalCount && totalValue) {
+        const pctCount = (top.count/totalCount*100).toFixed(1);
+        const pctValue = (top.value/totalValue*100).toFixed(1);
+        insights.push(`${top.type} accounted for ${pctCount}% of transaction volume but only ${pctValue}% of transaction value.`);
+      }
+    }
+    if (A.bankCharges.total>0) insights.push(`Bank charges totaled ${Utils.fmtMoney(A.bankCharges.total,true)} across ${A.bankCharges.count} transactions.`);
+    if (A.interestPaid.total>0) insights.push(`Interest paid totaled ${Utils.fmtMoney(A.interestPaid.total,true)} across ${A.interestPaid.count} transactions.`);
+    if (A.interestReceived.total>0) insights.push(`Interest received totaled ${Utils.fmtMoney(A.interestReceived.total,true)}.`);
+    if (A.penalties.total>0) insights.push(`Penalties totaled ${Utils.fmtMoney(A.penalties.total,true)} across ${A.penalties.count} transactions — review recommended.`);
+    const unclassifiedAmt = transactions.filter(t=>t.category==='Unclassified').reduce((s,t)=>s+t.debit+t.credit,0);
+    if (unclassifiedAmt>0) insights.push(`${Utils.fmtMoney(unclassifiedAmt,true)} across ${transactions.filter(t=>t.category==='Unclassified').length} transactions remains unclassified and requires review.`);
+    if (A.recurring && A.recurring.length) insights.push(`${A.recurring.length} potential recurring payment pattern(s) were identified, including ${A.recurring[0].counterparty}.`);
+    if (A.unusual && A.unusual.length) insights.push(`${A.unusual.length} transaction(s) were flagged for review as statistically unusual relative to category or counterparty averages.`);
+    if (A.balanceMismatch) insights.push(`The change in balance does not fully reconcile with total credits minus total debits — a balance consistency exception has been flagged.`);
+    return insights;
+  }
+};
+</script>
+<script>
+/* ================== DEMO DATA GENERATOR ================== */
+const DemoData = {
+  vendors: ['ABC Traders','Orion Enterprises','Vishal Impex','Nova Suppliers','Greenline Logistics','Metro Wholesale','Kavya Fabrics','Sundar Hardware','Pinnacle Packaging','Everest Stationery'],
+  customers: ['XYZ Client','Bluewave Retail','Coral Solutions','Zenith Corp','Harbor Textiles','Aster Foods','Northgate Traders','Lotus Distributors','Redwood Systems','Maple Ventures'],
+  employees: ['Ravi Kumar','Ananya Iyer','Suresh Menon','Priya Nair','Deepak Rao','Fatima Sheikh','Arjun Sharma','Meera Pillai'],
+  utilities: ['State Electricity Board','City Water Authority','Airtel Broadband','Jio Fiber','BSNL Telecom'],
+  banks: ['HDFC Bank','ICICI Bank','SBI','Axis Bank','Kotak Bank'],
+  rand(a,b){ return a + Math.random()*(b-a); },
+  randInt(a,b){ return Math.floor(this.rand(a,b+1)); },
+  pick(arr){ return arr[this.randInt(0,arr.length-1)]; },
+
+  generate(count){
+    const txs = [];
+    const start = new Date(); start.setFullYear(start.getFullYear()-1); start.setDate(1);
+    const totalDays = 365;
+    let balance = 1240000; // opening balance ~12.4L
+    const openingBalance = balance;
+    const refSet = new Set();
+    const rows = [];
+
+    // pre-generate recurring anchors
+    const salaryDay = 1, rentDay = 5;
+
+    for (let i=0;i<count;i++){
+      const dayOffset = this.randInt(0, totalDays-1);
+      const date = new Date(start); date.setDate(date.getDate()+dayOffset);
+      let type='', desc='', debit=0, credit=0, category='', counterparty='Unknown', ref='';
+
+      const roll = Math.random();
+      if (roll < 0.12){ // vendor payment (NEFT/RTGS)
+        type = Math.random()<0.7?'NEFT':'RTGS';
+        counterparty = this.pick(this.vendors);
+        debit = this.randInt(8000, 480000);
+        category = 'Vendor Payments';
+        ref = 'REF' + this.randInt(100000,999999);
+        desc = `${type}/${counterparty}/${ref}`;
+      } else if (roll < 0.24){ // customer receipt
+        type = Math.random()<0.6?'NEFT':(Math.random()<0.5?'RTGS':'IMPS');
+        counterparty = this.pick(this.customers);
+        credit = this.randInt(15000, 850000);
+        category = 'Customer Receipts';
+        ref = 'REF' + this.randInt(100000,999999);
+        desc = `${type}/${counterparty}/${ref}`;
+      } else if (roll < 0.45){ // UPI - many small transactions
+        type = 'UPI';
+        const isVendor = Math.random()<0.4;
+        counterparty = isVendor? this.pick(this.vendors) : this.pick(this.customers.concat(['Local Store','Cafe Coffee','Grocery Mart']));
+        if (Math.random()<0.5){ debit = this.randInt(200, 9000); category='Office Expenses'; }
+        else { credit = this.randInt(300, 25000); category='Sales Receipts'; }
+        ref = 'UPI' + this.randInt(100000000,999999999);
+        desc = `UPI/${counterparty}/${ref}`;
+      } else if (roll < 0.50 && date.getDate() <= 3){ // salary (monthly)
+        type='NEFT'; counterparty = this.pick(this.employees); debit = this.randInt(28000,95000);
+        category='Salary'; ref='SAL'+this.randInt(10000,99999);
+        desc = `SALARY/${counterparty}/${ref}`;
+      } else if (roll < 0.54 && date.getDate() <= 7){ // rent
+        type='NEFT'; counterparty='Property Owner LLP'; debit=this.randInt(45000,90000);
+        category='Rent'; ref='RENT'+this.randInt(1000,9999); desc=`RENT/${counterparty}/${ref}`;
+      } else if (roll < 0.58){ // utilities
+        type='NEFT'; counterparty=this.pick(this.utilities); debit=this.randInt(2500,32000);
+        category='Utilities'; ref='UTL'+this.randInt(10000,99999); desc=`${counterparty} BILL PAYMENT/${ref}`;
+      } else if (roll < 0.62){ // ATM cash withdrawal
+        type='ATM'; counterparty='Unknown'; debit=this.randInt(2000,40000);
+        category='Cash Withdrawal'; ref='ATM'+this.randInt(100000,999999); desc=`ATM CASH WDL/${ref}`;
+      } else if (roll < 0.66){ // taxes
+        type='NEFT'; counterparty='Income Tax Department'; debit=this.randInt(8000,180000);
+        category='Taxes'; ref='TAX'+this.randInt(10000,99999); desc=`GST PAYMENT/${ref}`;
+      } else if (roll < 0.71){ // bank charges
+        type='BANK CHARGE'; counterparty=this.pick(this.banks); debit=this.randInt(100,2500);
+        category='Bank Charges'; ref='CHG'+this.randInt(10000,99999); desc=`${counterparty} SERVICE CHARGE/${ref}`;
+      } else if (roll < 0.74){ // interest paid
+        type='OTHER'; counterparty=this.pick(this.banks); debit=this.randInt(2000,25000);
+        category='Interest Paid'; ref='INT'+this.randInt(10000,99999); desc=`LOAN INTEREST DEBIT/${ref}`;
+      } else if (roll < 0.76){ // interest received
+        type='OTHER'; counterparty=this.pick(this.banks); credit=this.randInt(500,6000);
+        category='Interest Received'; ref='INTCR'+this.randInt(10000,99999); desc=`SAVINGS INTEREST CREDIT/${ref}`;
+      } else if (roll < 0.78){ // penalty
+        type='OTHER'; counterparty=this.pick(this.banks); debit=this.randInt(500,9000);
+        category='Penalties'; ref='PEN'+this.randInt(10000,99999); desc=`CHEQUE BOUNCE PENALTY/${ref}`;
+      } else if (roll < 0.82){ // EMI/loan
+        type='ECS'; counterparty='Housing Finance Ltd'; debit=this.randInt(18000,55000);
+        category='Loan / EMI'; ref='EMI'+this.randInt(10000,99999); desc=`EMI ECS DEBIT/${ref}`;
+      } else if (roll < 0.86){ // cheque
+        type='CHEQUE'; counterparty=this.pick(this.vendors.concat(this.customers)); 
+        if (Math.random()<0.5){ debit=this.randInt(20000,300000); category='Vendor Payments'; } else { credit=this.randInt(20000,300000); category='Customer Receipts'; }
+        ref='CHQ'+this.randInt(100000,999999); desc=`CHEQUE ${Math.random()<0.5?'DEPOSIT':'PAID'}/${counterparty}/${ref}`;
+      } else if (roll < 0.90){ // marketing
+        type='NEFT'; counterparty='Digital Ads Partner'; debit=this.randInt(5000,60000);
+        category='Marketing'; ref='MKT'+this.randInt(10000,99999); desc=`MARKETING SERVICES/${ref}`;
+      } else if (roll < 0.94){ // travel
+        type='POS'; counterparty=this.pick(['IRCTC','Uber','Ola','Indigo Airlines']); debit=this.randInt(800,45000);
+        category='Travel'; ref='TRV'+this.randInt(10000,99999); desc=`${counterparty} POS PURCHASE/${ref}`;
+      } else if (roll < 0.985){ // transfers
+        type='TRANSFER'; counterparty='Own Account'; 
+        if (Math.random()<0.5){ debit=this.randInt(10000,200000); } else { credit=this.randInt(10000,200000); }
+        category='Transfers'; ref='TRF'+this.randInt(10000,99999); desc=`FUND TRANSFER OWN A/C/${ref}`;
+      } else { // unclassified oddball
+        type='OTHER'; counterparty='Misc Entity ' + this.randInt(1,20);
+        if (Math.random()<0.5){ debit=this.randInt(1000,30000);} else {credit=this.randInt(1000,30000);}
+        category='Unclassified'; ref='MISC'+this.randInt(10000,99999); desc=`PAYMENT ${ref}`;
+      }
+
+      if (refSet.has(ref) === false) refSet.add(ref);
+      rows.push({ date, description: desc, debit, credit, category, counterparty, type, reference: ref });
+    }
+
+    // inject a few duplicate references and missing dates / desc for validation demo
+    for (let i=0;i<6;i++){
+      const idx = this.randInt(0, rows.length-2);
+      rows[idx+1].reference = rows[idx].reference;
+    }
+    for (let i=0;i<4;i++){
+      rows[this.randInt(0,rows.length-1)].date = null;
+    }
+    for (let i=0;i<3;i++){
+      rows[this.randInt(0,rows.length-1)].description = '';
+    }
+    // a few unusually large transactions to trigger review
+    for (let i=0;i<3;i++){
+      const idx = this.randInt(0, rows.length-1);
+      if (rows[idx].debit>0) rows[idx].debit *= 6; else if (rows[idx].credit>0) rows[idx].credit *= 6;
+    }
+
+    rows.sort((a,b)=> (a.date||0) - (b.date||0));
+
+    rows.forEach((r,i)=>{
+      balance += (r.credit - r.debit);
+      const typeInfo = { type: r.type, reference: r.reference };
+      const cp = { name: r.counterparty, confidence: 82 };
+      txs.push({
+        id: Utils.uid(),
+        date: r.date, dateRaw: r.date?Utils.fmtDate(r.date):'',
+        description: r.description || '(no description)',
+        transactionType: r.type,
+        counterparty: r.counterparty,
+        counterpartyConfidence: cp.confidence,
+        referenceNumber: r.reference,
+        debit: r.debit, credit: r.credit,
+        balance: Math.round(balance*100)/100,
+        category: r.category,
+        confidence: r.category==='Unclassified'?15:85,
+        status: 'valid',
+        issues: !r.date? ['Missing or unparseable date'] : (!r.description? ['Missing description'] : []),
+        sourcePage: null, sourceRow: i+2, sourceType: 'demo'
+      });
+    });
+
+    // introduce one deliberate balance mismatch for the validation demo
+    if (txs.length > 20) {
+      txs[15].balance += 15000;
+    }
+
+    return { transactions: txs, openingBalance };
+  }
+};
+</script>
+<script>
+/* ================== PROCESSING UI ORCHESTRATOR ================== */
+const ProcessingUI = {
+  steps: [],
+  setSteps(list){
+    this.steps = list.map(s=>({label:s, state:'pending'}));
+    this.render();
+  },
+  setStepState(idx, state){
+    if (this.steps[idx]) this.steps[idx].state = state;
+    this.render();
+  },
+  setProgress(pct, sub){
+    document.getElementById('proc-bar').style.width = Math.min(100,Math.max(0,pct)) + '%';
+    if (sub) document.getElementById('proc-sub').textContent = sub;
+  },
+  render(){
+    const el = document.getElementById('proc-steps');
+    el.innerHTML = this.steps.map(s=>{
+      const cls = s.state==='done'?'done':(s.state==='active'?'active':'');
+      const mark = s.state==='done' ? '✓' : (s.state==='active' ? '' : '○');
+      return `<div class="proc-step ${cls}"><span class="mark">${mark}</span><span>${Utils.escapeHtml(s.label)}</span></div>`;
+    }).join('');
+  },
+  async run(mode, file){
+    document.getElementById('proc-title').textContent = 'Analyzing your statement';
+    this.setProgress(3, 'Starting…');
+    try {
+      if (mode === 'demo') {
+        this.setSteps(['File detected','Generating synthetic dataset','Classifying transactions','Validating data','Calculating analytics']);
+        this.setStepState(0,'done'); this.setProgress(15,'Preparing demo dataset');
+        await sleep(250);
+        this.setStepState(1,'active');
+        const { transactions } = DemoData.generate(1200);
+        this.setProgress(55,'1,200 transactions generated');
+        await sleep(300);
+        this.setStepState(1,'done'); this.setStepState(2,'active');
+        this.setProgress(70,'Classifying transaction types and categories');
+        await sleep(300);
+        this.setStepState(2,'done'); this.setStepState(3,'active');
+        this.setProgress(85,'Running validation checks');
+        const stats = ValidationEngine.run(transactions);
+        await sleep(250);
+        this.setStepState(3,'done'); this.setStepState(4,'active');
+        this.setProgress(96,'Calculating analytics');
+        State.transactions = transactions;
+        State.fileMeta = { name:'demo_statement.csv', size: 0, format:'Demo Data', ext:'csv' };
+        await sleep(250);
+        this.setStepState(4,'done'); this.setProgress(100,'Complete');
+        await sleep(200);
+        VerifyUI.show(stats);
+        return;
+      }
+
+      const ext = State.fileMeta.ext;
+      if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') {
+        this.setSteps(['File detected','Reading document','Extracting transactions','Identifying transaction structure','Classifying transactions','Calculating analytics']);
+        this.setStepState(0,'done'); this.setProgress(10,'Reading workbook');
+        const workbook = await ExcelEngine.parse(file);
+        this.setStepState(1,'done'); this.setStepState(2,'active'); this.setProgress(25,'Selecting sheet');
+
+        let sheetName = workbook.SheetNames[0];
+        if (workbook.SheetNames.length > 1) {
+          sheetName = await SheetSelectUI.prompt(workbook);
+        }
+        State.selectedSheet = sheetName;
+        const info = ExcelEngine.sheetScore(workbook.Sheets[sheetName]);
+        const rows = info.rows;
+        const headerRow = (rows[info.headerRowIdx]||[]).map(h=>String(h||'').trim());
+        const dataRows = rows.slice(info.headerRowIdx+1).filter(r=> r.some(c=>String(c).trim()!==''));
+        State.headerRow = headerRow;
+
+        this.setProgress(40,'Detecting column structure');
+        const { mapping, confidence } = DataNormalizer.detectMapping(headerRow);
+        const requiredOk = mapping.date && mapping.description && (mapping.debit||mapping.credit||mapping.amount);
+        const lowConfCount = Object.values(confidence).filter(c=>c<90).length;
+
+        let finalMapping = mapping;
+        if (!requiredOk || lowConfCount > 0) {
+          finalMapping = await MappingUI.prompt(headerRow, mapping, confidence);
+        }
+        State.mapping = finalMapping;
+        this.setStepState(2,'done'); this.setStepState(3,'active'); this.setProgress(55,'Normalizing rows');
+
+        const built = DataNormalizer.buildRowsFromMapping(dataRows, headerRow, finalMapping);
+        this.setStepState(3,'done'); this.setStepState(4,'active'); this.setProgress(72,'Classifying transaction types and categories');
+        await sleep(150);
+        const transactions = DataNormalizer.normalize(built, ext==='csv'?'csv':'excel');
+        this.setStepState(4,'done'); this.setStepState(5,'active'); this.setProgress(88,'Running validation checks');
+        const stats = ValidationEngine.run(transactions);
+        await sleep(150);
+        this.setStepState(5,'done'); this.setProgress(100,'Complete');
+        State.transactions = transactions;
+        await sleep(200);
+        VerifyUI.show(stats);
+        return;
+      }
+
+      if (ext === 'pdf') {
+        this.setSteps(['File detected','Reading document','Extracting transactions','Classifying transactions','Calculating analytics']);
+        this.setStepState(0,'done'); this.setProgress(8,'Opening PDF');
+        let result;
+        try {
+          result = await PdfEngine.extract(file, (p,total)=>{
+            document.getElementById('proc-sub').textContent = `Page ${p} of ${total}`;
+            this.setProgress(8 + (p/total)*30);
+          });
+        } catch(e) {
+          if (e.message === 'PASSWORD_OR_CORRUPT') {
+            throw new Error('This PDF appears to be password-protected or corrupted. Please remove the password or verify the file, then try again.');
+          }
+          throw e;
+        }
+        this.setStepState(1,'done'); this.setStepState(2,'active');
+
+        let rawRows;
+        let sourceType = 'pdf';
+        if (result.method === 'text') {
+          document.getElementById('proc-sub').textContent = 'Digital PDF detected. Extracting transaction data.';
+          this.setProgress(45);
+          rawRows = PdfEngine.parseRowsFromText(result.data);
+        } else {
+          document.getElementById('proc-sub').textContent = 'This appears to be a scanned statement. OCR will be used to read the document.';
+          await sleep(400);
+          const ocrEntries = await OcrEngine.run(result.pdfDoc, (progress)=>{
+            document.getElementById('proc-sub').textContent = `OCR processing: ${Math.round(progress*100)}%`;
+            this.setProgress(45 + progress*30);
+          });
+          rawRows = PdfEngine.parseRowsFromText(ocrEntries);
+          rawRows.forEach(r=> r._ocr = true);
+        }
+
+        if (!rawRows.length) {
+          throw new Error("We couldn't reliably identify the transaction structure in this file. Please verify that it is a bank statement, or try exporting it as Excel/CSV for more reliable extraction.");
+        }
+
+        this.setStepState(2,'done'); this.setStepState(3,'active'); this.setProgress(80,'Classifying transaction types and categories');
+        await sleep(150);
+        const transactions = DataNormalizer.normalize(rawRows, 'pdf', null);
+        transactions.forEach((t,i)=>{
+          t.sourcePage = rawRows[i] ? rawRows[i]._page : null;
+          if (rawRows[i] && rawRows[i]._lowConfidence) { t.confidence = Math.min(t.confidence, 55); if(t.status==='valid') t.status='review'; t.issues.push('Best-effort PDF text extraction — verify against source document'); }
+          if (rawRows[i] && rawRows[i]._ocr) { t.confidence = Math.min(t.confidence, 45); if(t.status==='valid') t.status='review'; t.issues.push('OCR Review Required — verify against source document'); }
+        });
+        this.setStepState(3,'done'); this.setStepState(4,'active'); this.setProgress(92,'Running validation checks');
+        const stats = ValidationEngine.run(transactions);
+        this.setStepState(4,'done'); this.setProgress(100,'Complete');
+        State.transactions = transactions;
+        State.pdfExtraction = result;
+        await sleep(200);
+        VerifyUI.show(stats);
+        return;
+      }
+    } catch(err){
+      console.error(err);
+      ProcessingUI.showError(err.message || 'Something went wrong while processing this file.');
+    }
+  },
+  showError(msg){
+    document.getElementById('proc-title').textContent = 'We ran into a problem';
+    document.getElementById('proc-sub').textContent = '';
+    document.getElementById('proc-bar').style.width='0%';
+    const el = document.getElementById('proc-steps');
+    el.innerHTML = `<div style="text-align:center;">
+      <p style="color:var(--red);font-weight:600;font-size:14px;line-height:1.6;">${Utils.escapeHtml(msg)}</p>
+      <button class="btn btn-primary" style="margin-top:18px;" id="proc-error-back">Back to Upload</button>
+    </div>`;
+    document.getElementById('proc-error-back').addEventListener('click', ()=> UIEngine.showPage('upload'));
+  }
+};
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+/* ---------------- SHEET SELECT UI ---------------- */
+const SheetSelectUI = {
+  prompt(workbook){
+    return new Promise(resolve=>{
+      const best = ExcelEngine.chooseBestSheet(workbook);
+      const list = document.getElementById('sheet-list');
+      list.innerHTML = workbook.SheetNames.map(name=>{
+        const info = ExcelEngine.sheetScore(workbook.Sheets[name]);
+        return `<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--grey-200);border-radius:8px;margin-bottom:8px;cursor:pointer;">
+          <input type="radio" name="sheetpick" value="${Utils.escapeHtml(name)}" ${name===best?'checked':''}>
+          <span style="flex:1;"><b>${Utils.escapeHtml(name)}</b><br><span style="color:var(--grey-600);font-size:12px;">${info.dataRows||0} rows detected${name===best?' · Recommended':''}</span></span>
+        </label>`;
+      }).join('');
+      const backdrop = document.getElementById('sheet-modal');
+      backdrop.classList.add('active');
+      const cleanup = ()=>{ backdrop.classList.remove('active'); confirmBtn.removeEventListener('click', onConfirm); cancelBtn.removeEventListener('click', onCancel); };
+      const confirmBtn = document.getElementById('sheet-confirm');
+      const cancelBtn = document.getElementById('sheet-cancel');
+      const onConfirm = ()=>{
+        const sel = list.querySelector('input[name=sheetpick]:checked');
+        cleanup();
+        resolve(sel ? sel.value : best);
+      };
+      const onCancel = ()=>{ cleanup(); resolve(best); };
+      confirmBtn.addEventListener('click', onConfirm);
+      cancelBtn.addEventListener('click', onCancel);
+    });
+  }
+};
+
+/* ---------------- MAPPING UI ---------------- */
+const MappingUI = {
+  fields: [
+    {key:'date', label:'Date', required:true},
+    {key:'description', label:'Description', required:true},
+    {key:'debit', label:'Debit', required:false},
+    {key:'credit', label:'Credit', required:false},
+    {key:'amount', label:'Amount (single column)', required:false},
+    {key:'balance', label:'Balance', required:false},
+    {key:'reference', label:'Reference No.', required:false}
+  ],
+  prompt(headerRow, mapping, confidence){
+    return new Promise(resolve=>{
+      const rows = document.getElementById('mapping-rows');
+      rows.innerHTML = this.fields.map(f=>{
+        const conf = confidence[f.key]||0;
+        const level = DataNormalizer.confidenceLevel(conf);
+        const options = ['<option value="">— none —</option>'].concat(
+          headerRow.map(h=>`<option value="${Utils.escapeHtml(h)}" ${mapping[f.key]===h?'selected':''}>${Utils.escapeHtml(h)}</option>`)
+        ).join('');
+        return `<div class="map-row" data-field="${f.key}">
+          <div><b>${f.label}</b>${f.required?' <span style="color:var(--red)">*</span>':''}</div>
+          <div style="text-align:center;color:var(--grey-400);">→</div>
+          <select data-field-select="${f.key}">${options}</select>
+          <span class="badge ${mapping[f.key]?level:'low'}">${mapping[f.key]?conf+'%':'unset'}</span>
+        </div>`;
+      }).join('');
+      const backdrop = document.getElementById('mapping-modal');
+      backdrop.classList.add('active');
+      const cleanup = ()=>{ backdrop.classList.remove('active'); confirmBtn.removeEventListener('click', onConfirm); cancelBtn.removeEventListener('click', onCancel); };
+      const confirmBtn = document.getElementById('mapping-confirm');
+      const cancelBtn = document.getElementById('mapping-cancel');
+      const onConfirm = ()=>{
+        const result = {};
+        this.fields.forEach(f=>{
+          const sel = rows.querySelector(`[data-field-select="${f.key}"]`);
+          if (sel && sel.value) result[f.key] = sel.value;
+        });
+        if (!result.date || !result.description || !(result.debit||result.credit||result.amount)) {
+          Utils.toast('Please map Date, Description and at least Debit/Credit or Amount.');
+          return;
+        }
+        cleanup(); resolve(result);
+      };
+      const onCancel = ()=>{ cleanup(); UIEngine.showPage('upload'); };
+      confirmBtn.addEventListener('click', onConfirm);
+      cancelBtn.addEventListener('click', onCancel);
+    });
+  }
+};
+
+/* ---------------- VERIFY UI ---------------- */
+const VerifyUI = {
+  show(stats){
+    UIEngine.showPage('verify');
+    const grid = document.getElementById('verify-grid');
+    const rows = [
+      ['Transactions extracted', stats.total],
+      ['Dates identified', stats.total - stats.missingDates],
+      ['Debit records', State.transactions.filter(t=>t.debit>0).length],
+      ['Credit records', State.transactions.filter(t=>t.credit>0).length],
+      ['Balance values available', State.transactions.filter(t=>t.balance!==null && t.balance!==undefined).length],
+      ['Potential issues', stats.exceptions + stats.needsReview],
+      ['Unclassified transactions', stats.unclassified]
+    ];
+    grid.innerHTML = rows.map(([l,v])=>`<div style="padding:10px 0;border-bottom:1px solid var(--grey-100);display:flex;justify-content:space-between;"><span style="color:var(--grey-600);font-size:13.5px;">${l}</span><span class="mono" style="font-weight:700;color:var(--navy);">${v.toLocaleString()}</span></div>`).join('');
+
+    const issuesEl = document.getElementById('verify-issues');
+    const problems = [];
+    if (stats.balanceExceptions) problems.push(`${stats.balanceExceptions} balance consistency exception(s) detected.`);
+    if (stats.duplicateRefs) problems.push(`${stats.duplicateRefs} duplicate reference number(s) found.`);
+    if (stats.missingDates) problems.push(`${stats.missingDates} transaction(s) have missing or unparseable dates.`);
+    if (stats.missingDesc) problems.push(`${stats.missingDesc} transaction(s) have missing descriptions.`);
+    if (stats.unclassified) problems.push(`${stats.unclassified} transaction(s) could not be automatically classified.`);
+    if (State.pdfExtraction && State.pdfExtraction.method !== 'text') problems.push('This statement was read using OCR. Please verify extracted amounts and dates carefully against the source document.');
+    else if (State.fileMeta && State.fileMeta.ext==='pdf') problems.push('PDF text extraction is best-effort. Row grouping may not perfectly match complex table layouts — verify totals against the source document.');
+
+    issuesEl.innerHTML = problems.length
+      ? `<div class="insight-list">${problems.map(p=>`<div class="insight-card"><span class="idot" style="background:var(--amber)"></span><p>${Utils.escapeHtml(p)}</p></div>`).join('')}</div>`
+      : `<div class="empty-state"><h4>Great — no critical validation exceptions were detected.</h4><p>You can continue to the dashboard.</p></div>`;
+
+    document.getElementById('verify-continue').onclick = ()=>{ UIEngine.enterApp(); };
+    document.getElementById('verify-back').onclick = ()=>{ UIEngine.showPage('upload'); };
+  }
+};
+</script>
+<script>
+/* ================== UI ENGINE ================== */
+const UIEngine = {
+  pages: ['landing','upload','processing','verify'],
+  showPage(name){
+    this.pages.forEach(p=> document.getElementById('page-'+p).classList.add('hidden'));
+    document.getElementById('app-shell').classList.remove('active');
+    if (this.pages.includes(name)) document.getElementById('page-'+name).classList.remove('hidden');
+  },
+  enterApp(){
+    this.pages.forEach(p=> document.getElementById('page-'+p).classList.add('hidden'));
+    document.getElementById('app-shell').classList.add('active');
+    document.getElementById('chip-filename').textContent = State.fileMeta.name;
+    const dated = State.transactions.filter(t=>t.date).sort((a,b)=>a.date-b.date);
+    if (dated.length) {
+      document.getElementById('chip-period').textContent = `${Utils.fmtDate(dated[0].date)} → ${Utils.fmtDate(dated[dated.length-1].date)}`;
+    } else {
+      document.getElementById('chip-period').textContent = '—';
+    }
+    this.populateFilterOptions();
+    this.applyFilters();
+    this.setView('dashboard');
+  },
+  populateFilterOptions(){
+    // populated per-view when filter bar is rendered
+  },
+  setView(view){
+    State.currentView = view;
+    document.querySelectorAll('.navitem[data-view]').forEach(el=>{
+      el.classList.toggle('active', el.dataset.view === view);
+    });
+    const titles = { dashboard:'Analytics Dashboard', insights:'Management Insights', transactions:'Transactions', reports:'Reports', settings:'Settings' };
+    document.getElementById('view-title').textContent = titles[view] || 'BankLens';
+    document.getElementById('sidebar').classList.remove('open');
+    if (view==='dashboard') DashboardView.render();
+    else if (view==='insights') InsightsView.render();
+    else if (view==='transactions') TransactionsView.render();
+    else if (view==='reports') ReportsView.render();
+    else if (view==='settings') SettingsView.render();
+    window.scrollTo({top:0,behavior:'instant'});
+  },
+  applyFilters(){
+    const f = State.filters;
+    State.filtered = State.transactions.filter(t=>{
+      if (f.from && (!t.date || t.date < f.from)) return false;
+      if (f.to && (!t.date || t.date > f.to)) return false;
+      if (f.direction==='inflow' && !(t.credit>0)) return false;
+      if (f.direction==='outflow' && !(t.debit>0)) return false;
+      if (f.type!=='all' && t.transactionType !== f.type) return false;
+      if (f.category!=='all' && t.category !== f.category) return false;
+      if (f.counterparty && !t.counterparty.toLowerCase().includes(f.counterparty.toLowerCase())) return false;
+      if (f.status!=='all' && t.status !== f.status) return false;
+      return true;
+    });
+    State.analytics = AnalyticsEngine.compute(State.filtered);
+    State.insights = InsightEngine.generate(State.analytics, State.filtered);
+  },
+  filtersBarHTML(){
+    const types = [...new Set(State.transactions.map(t=>t.transactionType))].sort();
+    const cats = [...new Set(State.transactions.map(t=>t.category))].sort();
+    const f = State.filters;
+    return `<div class="filters-bar">
+      <div class="filt-field"><label>From</label><input type="date" id="f-from" value="${f.from?f.from.toISOString().slice(0,10):''}"></div>
+      <div class="filt-field"><label>To</label><input type="date" id="f-to" value="${f.to?f.to.toISOString().slice(0,10):''}"></div>
+      <div class="filt-field"><label>Direction</label><select id="f-direction">
+        <option value="all" ${f.direction==='all'?'selected':''}>All</option>
+        <option value="inflow" ${f.direction==='inflow'?'selected':''}>Inflow</option>
+        <option value="outflow" ${f.direction==='outflow'?'selected':''}>Outflow</option>
+      </select></div>
+      <div class="filt-field"><label>Type</label><select id="f-type">
+        <option value="all">All</option>
+        ${types.map(t=>`<option value="${t}" ${f.type===t?'selected':''}>${t}</option>`).join('')}
+      </select></div>
+      <div class="filt-field"><label>Category</label><select id="f-category">
+        <option value="all">All categories</option>
+        ${cats.map(c=>`<option value="${Utils.escapeHtml(c)}" ${f.category===c?'selected':''}>${Utils.escapeHtml(c)}</option>`).join('')}
+      </select></div>
+      <div class="filt-field"><label>Counterparty</label><input type="text" id="f-counterparty" placeholder="Search…" value="${Utils.escapeHtml(f.counterparty)}"></div>
+      <div class="filt-field"><label>Status</label><select id="f-status">
+        <option value="all" ${f.status==='all'?'selected':''}>All</option>
+        <option value="valid" ${f.status==='valid'?'selected':''}>Valid</option>
+        <option value="review" ${f.status==='review'?'selected':''}>Needs Review</option>
+        <option value="exception" ${f.status==='exception'?'selected':''}>Exception</option>
+      </select></div>
+      <button class="btn btn-ghost btn-sm" id="f-reset">Reset filters</button>
+    </div>`;
+  },
+  bindFiltersBar(onChange){
+    const ids = ['f-from','f-to','f-direction','f-type','f-category','f-counterparty','f-status'];
+    ids.forEach(id=>{
+      const el = document.getElementById(id);
+      if (!el) return;
+      const evt = (el.tagName==='SELECT') ? 'change' : (el.type==='date' ? 'change' : 'input');
+      el.addEventListener(evt, Utils.debounce(()=>{
+        State.filters.from = document.getElementById('f-from').value ? new Date(document.getElementById('f-from').value) : null;
+        State.filters.to = document.getElementById('f-to').value ? new Date(document.getElementById('f-to').value) : null;
+        State.filters.direction = document.getElementById('f-direction').value;
+        State.filters.type = document.getElementById('f-type').value;
+        State.filters.category = document.getElementById('f-category').value;
+        State.filters.counterparty = document.getElementById('f-counterparty').value;
+        State.filters.status = document.getElementById('f-status').value;
+        UIEngine.applyFilters();
+        onChange();
+      }, 220));
+    });
+    const resetBtn = document.getElementById('f-reset');
+    if (resetBtn) resetBtn.addEventListener('click', ()=>{
+      State.filters = { from:null, to:null, direction:'all', type:'all', category:'all', counterparty:'', status:'all' };
+      UIEngine.applyFilters();
+      onChange();
+    });
+  },
+  goToQuestion(section, filterPatch){
+    if (filterPatch) Object.assign(State.filters, filterPatch);
+    UIEngine.applyFilters();
+    this.setView('dashboard');
+    setTimeout(()=>{
+      const el = document.getElementById(section);
+      if (el) el.scrollIntoView({behavior:'smooth', block:'start'});
+    }, 60);
+  }
+};
+</script>
+<script>
+/* ================== CHART ENGINE ================== */
+const ChartEngine = {
+  instances: {},
+  colors: { blue:'#3B6FE0', navy:'#0E1B2C', green:'#1E8E5A', amber:'#B5750F', red:'#C4392B', grey:'#9AA6B2',
+    palette:['#3B6FE0','#1E8E5A','#B5750F','#C4392B','#7C5CD6','#0E7A8C','#D6733B','#5C6B7A','#9C4CC4','#2FA1A1'] },
+  destroy(id){ if (this.instances[id]) { this.instances[id].destroy(); delete this.instances[id]; } },
+  monthlyBar(id, monthly){
+    this.destroy(id);
+    const ctx = document.getElementById(id); if (!ctx) return;
+    this.instances[id] = new Chart(ctx, {
+      type:'bar',
+      data:{ labels: monthly.map(m=>m.label),
+        datasets:[
+          {label:'Inflow', data:monthly.map(m=>m.inflow), backgroundColor:this.colors.blue, borderRadius:4, maxBarThickness:28},
+          {label:'Outflow', data:monthly.map(m=>m.outflow), backgroundColor:this.colors.red, borderRadius:4, maxBarThickness:28}
+        ]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{position:'top', labels:{usePointStyle:true, boxWidth:8, font:{family:'Manrope', size:12}}},
+          tooltip:{callbacks:{label: c=> `${c.dataset.label}: ${Utils.fmtMoney(c.parsed.y, true)}`}} },
+        scales:{ y:{ ticks:{ callback:v=>Utils.fmtMoney(v,true), font:{family:'IBM Plex Mono', size:10.5} }, grid:{color:'#EEF1F5'} },
+          x:{ grid:{display:false}, ticks:{font:{family:'Manrope', size:11}} } }
+      }
+    });
+  },
+  netTrendLine(id, monthly){
+    this.destroy(id);
+    const ctx = document.getElementById(id); if (!ctx) return;
+    this.instances[id] = new Chart(ctx, {
+      type:'line',
+      data:{ labels: monthly.map(m=>m.label),
+        datasets:[{ label:'Net Cash Movement', data: monthly.map(m=>m.net), borderColor:this.colors.blue,
+          backgroundColor:'rgba(59,111,224,.1)', fill:true, tension:.3, pointRadius:3,
+          segment:{ borderColor: ctx2=> ctx2.p0.parsed.y<0 || ctx2.p1.parsed.y<0 ? this.colors.red : this.colors.blue }
+        }]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>`Net: ${Utils.fmtMoney(c.parsed.y,true)}`}} },
+        scales:{ y:{ ticks:{callback:v=>Utils.fmtMoney(v,true), font:{family:'IBM Plex Mono', size:10.5}}, grid:{color:'#EEF1F5'} },
+          x:{ grid:{display:false} } }
+      }
+    });
+  },
+  horizontalBar(id, items, labelKey, valueKey, color){
+    this.destroy(id);
+    const ctx = document.getElementById(id); if (!ctx) return;
+    const top = items.slice(0,10);
+    this.instances[id] = new Chart(ctx, {
+      type:'bar',
+      data:{ labels: top.map(i=>i[labelKey]), datasets:[{ data: top.map(i=>i[valueKey]), backgroundColor: color||this.colors.blue, borderRadius:4, maxBarThickness:20 }]},
+      options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>Utils.fmtMoney(c.parsed.x,true)}} },
+        scales:{ x:{ ticks:{callback:v=>Utils.fmtMoney(v,true), font:{family:'IBM Plex Mono', size:10.5}}, grid:{color:'#EEF1F5'} },
+          y:{ grid:{display:false}, ticks:{font:{family:'Manrope', size:11.5}} } }
+      }
+    });
+  },
+  doughnut(id, items, labelKey, valueKey){
+    this.destroy(id);
+    const ctx = document.getElementById(id); if (!ctx) return;
+    const top = items.slice(0,8);
+    this.instances[id] = new Chart(ctx, {
+      type:'doughnut',
+      data:{ labels: top.map(i=>i[labelKey]), datasets:[{ data: top.map(i=>i[valueKey]), backgroundColor:this.colors.palette, borderWidth:2, borderColor:'#fff' }]},
+      options:{ responsive:true, maintainAspectRatio:false, cutout:'62%',
+        plugins:{ legend:{position:'right', labels:{boxWidth:9, font:{family:'Manrope', size:11}}},
+          tooltip:{callbacks:{label:c=>`${c.label}: ${Utils.fmtMoney(c.parsed,true)}`}} }
+      }
+    });
+  },
+  typeCountValue(id, byType){
+    this.destroy(id);
+    const ctx = document.getElementById(id); if (!ctx) return;
+    const top = byType.slice(0,8);
+    this.instances[id] = new Chart(ctx, {
+      type:'bar',
+      data:{ labels: top.map(t=>t.type),
+        datasets:[
+          {label:'Count', data: top.map(t=>t.count), backgroundColor:this.colors.blue, yAxisID:'y', borderRadius:4, maxBarThickness:26},
+        ]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false} },
+        scales:{ y:{ ticks:{font:{family:'IBM Plex Mono', size:10.5}}, grid:{color:'#EEF1F5'} }, x:{grid:{display:false}} }
+      }
+    });
+  }
+};
+</script>
+<script>
+/* ================== DASHBOARD VIEW ================== */
+const DashboardView = {
+  render(){
+    const root = document.getElementById('content-root');
+    if (!State.transactions.length) { root.innerHTML = EmptyStates.noStatement(); return; }
+    const A = State.analytics;
+    root.innerHTML = `
+      ${UIEngine.filtersBarHTML()}
+
+      <div class="kpi-row">
+        ${this.kpi('Total Transactions', A.totalCount.toLocaleString(), `${A.debitCount.toLocaleString()} debit · ${A.creditCount.toLocaleString()} credit`, 'blue')}
+        ${this.kpi('Total Inflow', Utils.fmtMoney(A.totalInflow,true), 'Sum of valid credits', 'green')}
+        ${this.kpi('Total Outflow', Utils.fmtMoney(A.totalOutflow,true), 'Sum of valid debits', 'red')}
+        ${this.kpi('Net Movement', Utils.fmtMoney(A.netMovement,true), A.netMovement>=0?'Positive cash movement':'Negative cash movement', A.netMovement>=0?'green':'red')}
+      </div>
+      <div class="kpi-row">
+        ${this.kpi('Opening Balance', A.openingBalance!==null?Utils.fmtMoney(A.openingBalance,true):'—', 'Earliest available balance', 'blue')}
+        ${this.kpi('Closing Balance', A.closingBalance!==null?Utils.fmtMoney(A.closingBalance,true):'—', 'Latest available balance', 'blue')}
+        ${this.kpi('Highest Receipt', A.highestInflowTx?Utils.fmtMoney(A.highestInflowTx.credit,true):'—', A.highestInflowTx?A.highestInflowTx.counterparty:'', 'green')}
+        ${this.kpi('Highest Payment', A.highestOutflowTx?Utils.fmtMoney(A.highestOutflowTx.debit,true):'—', A.highestOutflowTx?A.highestOutflowTx.counterparty:'', 'red')}
+      </div>
+      <div class="kpi-row">
+        ${this.kpi('Bank Charges', Utils.fmtMoney(A.bankCharges.total,true), `${A.bankCharges.count} transactions`, 'amber')}
+        ${this.kpi('Interest Paid', Utils.fmtMoney(A.interestPaid.total,true), `${A.interestPaid.count} transactions`, 'amber')}
+        ${this.kpi('Interest Received', Utils.fmtMoney(A.interestReceived.total,true), `${A.interestReceived.count} transactions`, 'green')}
+        ${this.kpi('Exceptions', (State.filtered.filter(t=>t.status==='exception').length).toLocaleString(), `${State.filtered.filter(t=>t.status==='review').length} need review`, 'red')}
+      </div>
+
+      ${A.balanceMismatch ? `<div class="limitation-note">⚠️ <span>Net movement calculated from transactions does not fully match the change in statement balance. This has been flagged as a balance consistency exception — see Transactions Requiring Review.</span></div>` : ''}
+
+      <div class="card" id="sec-questions">
+        <div class="card-head"><h3>What do you want to know?</h3><span class="card-sub">Click a question to jump to the relevant analysis</span></div>
+        <div class="q-grid">
+          ${this.qCard('Where did our money go?','Category breakdown of outflow','sec-category')}
+          ${this.qCard('Who did we pay the most?','Top payment recipients','sec-payees')}
+          ${this.qCard('Who paid us the most?','Top receipt sources','sec-payers')}
+          ${this.qCard('Which month had the highest outflow?', A.highestOutflowMonth?A.highestOutflowMonth.label:'—','sec-monthly')}
+          ${this.qCard('Which month had the highest inflow?', A.highestInflowMonth?A.highestInflowMonth.label:'—','sec-monthly')}
+          ${this.qCard('What are our biggest expenses?','Category-level cost breakdown','sec-category')}
+          ${this.qCard('How much did we pay in bank charges?', Utils.fmtMoney(A.bankCharges.total,true),'sec-charges')}
+          ${this.qCard('How many NEFT / RTGS / UPI transactions?','Transaction type analysis','sec-type')}
+          ${this.qCard('What are our largest transactions?','Top payments and receipts','sec-largest')}
+          ${this.qCard('What requires review?', `${State.filtered.filter(t=>t.status!=='valid').length} flagged`,'sec-review')}
+        </div>
+      </div>
+
+      <div class="card" id="sec-monthly">
+        <div class="card-head"><h3>Monthly Cash Flow</h3><span class="card-sub">Inflow vs outflow by month</span></div>
+        ${A.monthly.length ? `<div class="chart-wrap"><canvas id="chart-monthly"></canvas></div>` : EmptyStates.inline('No dated transactions available to build a monthly view.')}
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Cash Flow Trend</h3><span class="card-sub">Monthly net cash movement</span></div>
+        ${A.monthly.length ? `<div class="chart-wrap"><canvas id="chart-trend"></canvas></div>` : EmptyStates.inline('No dated transactions available.')}
+      </div>
+
+      <div class="card" id="sec-category">
+        <div class="card-head"><h3>Where Did the Money Go?</h3><span class="card-sub">Outflow by category</span></div>
+        ${A.categoryOutflow.length ? `<div class="two-col"><div class="chart-wrap"><canvas id="chart-cat-out"></canvas></div>
+          <div class="table-scroll"><table><thead><tr><th>Category</th><th class="num">Amount</th><th class="num">% of outflow</th></tr></thead><tbody>
+          ${A.categoryOutflow.slice(0,10).map(c=>`<tr><td>${Utils.escapeHtml(c.category)}</td><td class="num mono">${Utils.fmtMoney(c.total,true)}</td><td class="num mono">${A.totalOutflow?((c.total/A.totalOutflow)*100).toFixed(1):'0'}%</td></tr>`).join('')}
+          </tbody></table></div></div>` : EmptyStates.inline('No outflow transactions in the current filter.')}
+      </div>
+
+      <div class="card" id="sec-type">
+        <div class="card-head"><h3>How Was Money Moved?</h3><span class="card-sub">Transaction type — count vs value (never confuse frequency with amount)</span></div>
+        ${A.byType.length ? `<div class="two-col">
+          <div class="chart-wrap"><canvas id="chart-type"></canvas></div>
+          <div class="table-scroll"><table><thead><tr><th>Type</th><th class="num">Count</th><th class="num">Value</th></tr></thead><tbody>
+          ${A.byType.map(t=>`<tr><td>${Utils.escapeHtml(t.type)}</td><td class="num mono">${t.count.toLocaleString()}</td><td class="num mono">${Utils.fmtMoney(t.value,true)}</td></tr>`).join('')}
+          </tbody></table></div></div>` : EmptyStates.inline('No transactions in the current filter.')}
+      </div>
+
+      <div class="card" id="sec-payees">
+        <div class="card-head"><h3>Who Did We Pay?</h3><span class="card-sub">Top 10 payment recipients</span></div>
+        ${A.topPayees.length ? this.counterpartyTable(A.topPayees,'Total Paid') : EmptyStates.inline('No payment recipients found.')}
+      </div>
+      <div class="card" id="sec-payers">
+        <div class="card-head"><h3>Who Paid Us?</h3><span class="card-sub">Top 10 receipt sources</span></div>
+        ${A.topPayers.length ? this.counterpartyTable(A.topPayers,'Total Received') : EmptyStates.inline('No receipt sources found.')}
+      </div>
+
+      <div class="card" id="sec-largest">
+        <div class="card-head"><h3>Largest Transactions</h3></div>
+        <div class="two-col">
+          <div><h4 style="font-size:13.5px;color:var(--grey-600);margin-bottom:8px;">Largest Payments</h4>${this.txMiniTable(A.largestPayments,'debit')}</div>
+          <div><h4 style="font-size:13.5px;color:var(--grey-600);margin-bottom:8px;">Largest Receipts</h4>${this.txMiniTable(A.largestReceipts,'credit')}</div>
+        </div>
+      </div>
+
+      <div class="card" id="sec-charges">
+        <div class="card-head"><h3>Charges, Interest &amp; Penalties</h3></div>
+        <div class="kpi-row" style="margin-bottom:0;">
+          ${this.kpi('Bank Charges', Utils.fmtMoney(A.bankCharges.total,true), `${A.bankCharges.count} txns · avg ${A.bankCharges.count?Utils.fmtMoney(A.bankCharges.total/A.bankCharges.count,true):'—'}`, 'amber')}
+          ${this.kpi('Interest Paid', Utils.fmtMoney(A.interestPaid.total,true), `${A.interestPaid.count} txns`, 'red')}
+          ${this.kpi('Interest Received', Utils.fmtMoney(A.interestReceived.total,true), `${A.interestReceived.count} txns`, 'green')}
+          ${this.kpi('Penalties', Utils.fmtMoney(A.penalties.total,true), `${A.penalties.count} txns`, 'red')}
+        </div>
+      </div>
+
+      <div class="card" id="sec-recurring">
+        <div class="card-head"><h3>Recurring Payments</h3><span class="card-sub">Potential recurring transactions, based on similar amount, counterparty and repeated monthly intervals</span></div>
+        ${A.recurring.length ? `<div class="table-scroll"><table><thead><tr><th>Counterparty</th><th>Category</th><th>Direction</th><th class="num">Occurrences</th><th class="num">Avg Amount</th></tr></thead><tbody>
+          ${A.recurring.slice(0,15).map(r=>`<tr><td>${Utils.escapeHtml(r.counterparty)}</td><td>${Utils.escapeHtml(r.category)}</td><td>${r.direction==='outflow'?'Outflow':'Inflow'}</td><td class="num mono">${r.count}</td><td class="num mono">${Utils.fmtMoney(r.avgAmount,true)}</td></tr>`).join('')}
+          </tbody></table></div>` : EmptyStates.inline('No potential recurring transactions were identified.')}
+      </div>
+
+      <div class="card" id="sec-review">
+        <div class="card-head"><h3>Transactions Requiring Review</h3><span class="card-sub">Flagged using transparent, explainable rules — not a fraud determination</span></div>
+        ${A.unusual.length ? `<div class="table-scroll"><table><thead><tr><th>Date</th><th>Description</th><th>Category</th><th class="num">Amount</th><th>Reason</th></tr></thead><tbody>
+          ${A.unusual.slice(0,15).map(u=>`<tr><td>${Utils.fmtDate(u.tx.date)}</td><td>${Utils.escapeHtml(u.tx.description)}</td><td>${Utils.escapeHtml(u.tx.category)}</td><td class="num mono">${Utils.fmtMoney(u.tx.debit||u.tx.credit,true)}</td><td style="color:var(--amber);font-size:12.5px;">${Utils.escapeHtml(u.reason)}</td></tr>`).join('')}
+          </tbody></table></div>` : EmptyStates.inline('No transactions requiring review were identified under the current threshold.')}
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>Management Insights</h3><span class="card-sub">Automatically generated from the current dataset</span></div>
+        ${InsightsView.listHTML()}
+      </div>
+    `;
+    if (A.monthly.length) { ChartEngine.monthlyBar('chart-monthly', A.monthly); ChartEngine.netTrendLine('chart-trend', A.monthly); }
+    if (A.categoryOutflow.length) ChartEngine.horizontalBar('chart-cat-out', A.categoryOutflow, 'category','total', ChartEngine.colors.blue);
+    if (A.byType.length) ChartEngine.typeCountValue('chart-type', A.byType);
+    UIEngine.bindFiltersBar(()=> DashboardView.render());
+    document.querySelectorAll('[data-goto]').forEach(el=> el.addEventListener('click', ()=>{
+      document.getElementById(el.dataset.goto).scrollIntoView({behavior:'smooth', block:'start'});
+    }));
+  },
+  kpi(label, value, sub, accent){
+    return `<div class="kpi accent-${accent}"><div class="klabel">${label}</div><div class="kvalue">${value}</div><div class="ksub">${Utils.escapeHtml(sub||'')}</div></div>`;
+  },
+  qCard(q, sub, gotoId){
+    return `<div class="q-card" data-goto="${gotoId}">${Utils.escapeHtml(q)}<span>${Utils.escapeHtml(sub)}</span></div>`;
+  },
+  counterpartyTable(list, totalLabel){
+    return `<div class="table-scroll"><table><thead><tr><th>#</th><th>Counterparty</th><th class="num">Transactions</th><th class="num">${totalLabel}</th><th class="num">Average</th><th class="num">Largest</th></tr></thead><tbody>
+      ${list.map((p,i)=>`<tr><td><span class="rank-badge">${i+1}</span></td><td>${Utils.escapeHtml(p.counterparty)}</td><td class="num mono">${p.count}</td><td class="num mono">${Utils.fmtMoney(p.total,true)}</td><td class="num mono">${Utils.fmtMoney(p.avg,true)}</td><td class="num mono">${Utils.fmtMoney(p.largest,true)}</td></tr>`).join('')}
+      </tbody></table></div>`;
+  },
+  txMiniTable(list, kind){
+    if (!list.length) return EmptyStates.inline('None found.');
+    return `<div class="table-scroll"><table><thead><tr><th>Date</th><th>Counterparty</th><th class="num">Amount</th><th>Category</th></tr></thead><tbody>
+      ${list.map(t=>`<tr><td>${Utils.fmtDate(t.date)}</td><td>${Utils.escapeHtml(t.counterparty)}</td><td class="num mono ${kind==='credit'?'amt-credit':'amt-debit'}">${Utils.fmtMoney(kind==='credit'?t.credit:t.debit,true)}</td><td>${Utils.escapeHtml(t.category)}</td></tr>`).join('')}
+      </tbody></table></div>`;
+  }
+};
+
+const EmptyStates = {
+  noStatement(){
+    return `<div class="card"><div class="empty-state">
+      <svg class="es-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg>
+      <h4>No statement analyzed yet.</h4><p>Upload a bank statement to begin.</p>
+    </div></div>`;
+  },
+  inline(msg){ return `<div class="empty-state"><p>${Utils.escapeHtml(msg)}</p></div>`; }
+};
+</script>
+<script>
+/* ================== INSIGHTS VIEW ================== */
+const InsightsView = {
+  listHTML(){
+    if (!State.insights || !State.insights.length) return EmptyStates.inline('No insights could be generated from the current filter.');
+    return `<div class="insight-list">${State.insights.map(i=>`<div class="insight-card"><span class="idot"></span><p>${Utils.escapeHtml(i)}</p></div>`).join('')}</div>`;
+  },
+  render(){
+    const root = document.getElementById('content-root');
+    if (!State.transactions.length) { root.innerHTML = EmptyStates.noStatement(); return; }
+    const A = State.analytics;
+    root.innerHTML = `
+      ${UIEngine.filtersBarHTML()}
+      <div class="card">
+        <div class="card-head"><h3>Management Insights</h3><span class="card-sub">Deterministic observations generated directly from the current dataset — no AI-generated commentary</span></div>
+        ${this.listHTML()}
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Sample Management Story</h3><span class="card-sub">A quick narrative summary of this statement</span></div>
+        <div class="grid-2">
+          <div class="table-scroll"><table><tbody>
+            <tr><td>Total transactions</td><td class="num mono">${A.totalCount.toLocaleString()}</td></tr>
+            <tr><td>Total inflow</td><td class="num mono amt-credit">${Utils.fmtMoney(A.totalInflow,true)}</td></tr>
+            <tr><td>Total outflow</td><td class="num mono amt-debit">${Utils.fmtMoney(A.totalOutflow,true)}</td></tr>
+            <tr><td>Net movement</td><td class="num mono">${Utils.fmtMoney(A.netMovement,true)}</td></tr>
+            <tr><td>Highest inflow month</td><td class="num mono">${A.highestInflowMonth?A.highestInflowMonth.label:'—'}</td></tr>
+            <tr><td>Highest outflow month</td><td class="num mono">${A.highestOutflowMonth?A.highestOutflowMonth.label:'—'}</td></tr>
+          </tbody></table></div>
+          <div class="table-scroll"><table><tbody>
+            <tr><td>Largest payment recipient</td><td class="num mono">${A.topPayees[0]?Utils.escapeHtml(A.topPayees[0].counterparty):'—'}</td></tr>
+            <tr><td>Largest receipt source</td><td class="num mono">${A.topPayers[0]?Utils.escapeHtml(A.topPayers[0].counterparty):'—'}</td></tr>
+            <tr><td>Largest payment</td><td class="num mono">${A.highestOutflowTx?Utils.fmtMoney(A.highestOutflowTx.debit,true):'—'}</td></tr>
+            <tr><td>Largest receipt</td><td class="num mono">${A.highestInflowTx?Utils.fmtMoney(A.highestInflowTx.credit,true):'—'}</td></tr>
+            <tr><td>Bank charges</td><td class="num mono">${Utils.fmtMoney(A.bankCharges.total,true)}</td></tr>
+            <tr><td>Unclassified value</td><td class="num mono">${Utils.fmtMoney(State.filtered.filter(t=>t.category==='Unclassified').reduce((s,t)=>s+t.debit+t.credit,0),true)}</td></tr>
+          </tbody></table></div>
+        </div>
+      </div>
+    `;
+    UIEngine.bindFiltersBar(()=> InsightsView.render());
+  }
+};
+
+/* ================== TRANSACTIONS VIEW (Explorer) ================== */
+const TransactionsView = {
+  render(){
+    const root = document.getElementById('content-root');
+    if (!State.transactions.length) { root.innerHTML = EmptyStates.noStatement(); return; }
+    const catMap = LocalStore.getCategoryMap();
+    const unclassifiedGroups = this.groupUnclassified();
+    root.innerHTML = `
+      ${UIEngine.filtersBarHTML()}
+      ${unclassifiedGroups.length ? `<div class="card">
+        <div class="card-head"><h3>Classify Unclassified Transactions</h3><span class="card-sub">Assign a category once — BankLens remembers it for matching descriptions</span></div>
+        <div class="table-scroll"><table><thead><tr><th>Counterparty / Description</th><th class="num">Transactions</th><th class="num">Total</th><th>Assign Category</th></tr></thead><tbody>
+          ${unclassifiedGroups.slice(0,12).map(g=>`<tr>
+            <td>${Utils.escapeHtml(g.key)}</td>
+            <td class="num mono">${g.count}</td>
+            <td class="num mono">${Utils.fmtMoney(g.total,true)}</td>
+            <td><select data-classify-key="${Utils.escapeHtml(g.key)}" style="border:1px solid var(--grey-200);border-radius:6px;padding:6px 8px;font-size:12.5px;">
+              <option value="">Choose category…</option>
+              ${CategoryEngine.rules.map(r=>r[0]).concat(['Other Receipts','Other','Vendor Payments','Customer Receipts']).filter((v,i,a)=>a.indexOf(v)===i).map(c=>`<option value="${c}">${c}</option>`).join('')}
+            </select></td>
+          </tr>`).join('')}
+        </tbody></table></div>
+      </div>` : ''}
+
+      <div class="card">
+        <div class="card-head">
+          <h3>Transaction Explorer</h3>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="text" id="tx-search" placeholder="Search description or counterparty…" style="border:1px solid var(--grey-200);border-radius:6px;padding:8px 10px;font-size:13px;min-width:220px;">
+            <button class="btn btn-secondary btn-sm" id="tx-export">Export Filtered (Excel)</button>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Counterparty</th><th>Reference</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th><th>Category</th><th>Confidence</th><th>Status</th></tr></thead>
+            <tbody id="tx-table-body"></tbody>
+          </table>
+        </div>
+        <div class="pager" id="tx-pager"></div>
+      </div>
+    `;
+    UIEngine.bindFiltersBar(()=> TransactionsView.render());
+    document.getElementById('tx-search').addEventListener('input', Utils.debounce(e=>{
+      this.searchTerm = e.target.value.toLowerCase();
+      this.renderTable();
+    }, 200));
+    document.getElementById('tx-export').addEventListener('click', ()=> ExportEngine.exportExcel(State.filtered, 'BankLens_Filtered_Transactions.xlsx'));
+    document.querySelectorAll('[data-classify-key]').forEach(sel=>{
+      sel.addEventListener('change', e=>{
+        const key = e.target.dataset.classifyKey;
+        const cat = e.target.value;
+        if (!cat) return;
+        LocalStore.addMapping(key, cat);
+        State.transactions.filter(t=> (t.counterparty||'').toUpperCase()===key.toUpperCase()).forEach(t=>{ t.category = cat; t.confidence = 98; });
+        UIEngine.applyFilters();
+        Utils.toast(`Mapped "${key}" → ${cat} for future matching transactions.`);
+        TransactionsView.render();
+      });
+    });
+    State.txPage = 1;
+    this.renderTable();
+  },
+  searchTerm: '',
+  groupUnclassified(){
+    const groups = {};
+    State.transactions.filter(t=>t.category==='Unclassified').forEach(t=>{
+      const key = t.counterparty && t.counterparty!=='Unknown' ? t.counterparty : t.description.slice(0,30);
+      if (!groups[key]) groups[key] = { key, count:0, total:0 };
+      groups[key].count++; groups[key].total += t.debit+t.credit;
+    });
+    return Object.values(groups).sort((a,b)=>b.total-a.total);
+  },
+  renderTable(){
+    let rows = State.filtered;
+    if (this.searchTerm) {
+      rows = rows.filter(t=> t.description.toLowerCase().includes(this.searchTerm) || t.counterparty.toLowerCase().includes(this.searchTerm));
+    }
+    const totalPages = Math.max(1, Math.ceil(rows.length / State.txPageSize));
+    State.txPage = Math.min(State.txPage, totalPages);
+    const startIdx = (State.txPage-1)*State.txPageSize;
+    const pageRows = rows.slice(startIdx, startIdx + State.txPageSize);
+    document.getElementById('tx-table-body').innerHTML = pageRows.length ? pageRows.map(t=>`
+      <tr>
+        <td class="mono">${Utils.fmtDate(t.date)}</td>
+        <td style="max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${Utils.escapeHtml(t.description)}">${Utils.escapeHtml(t.description)}</td>
+        <td>${Utils.escapeHtml(t.transactionType)}</td>
+        <td>${Utils.escapeHtml(t.counterparty)}</td>
+        <td class="mono" style="font-size:11.5px;color:var(--grey-600);">${Utils.escapeHtml(t.referenceNumber||'—')}</td>
+        <td class="num mono ${t.debit>0?'amt-debit':''}">${t.debit>0?Utils.fmtMoney(t.debit):'—'}</td>
+        <td class="num mono ${t.credit>0?'amt-credit':''}">${t.credit>0?Utils.fmtMoney(t.credit):'—'}</td>
+        <td class="num mono">${t.balance!==null&&t.balance!==undefined?Utils.fmtMoney(t.balance):'—'}</td>
+        <td>${Utils.escapeHtml(t.category)}</td>
+        <td><span class="badge ${DataNormalizer.confidenceLevel(t.confidence)}">${t.confidence}%</span></td>
+        <td><span class="status-pill ${t.status}">${t.status==='valid'?'Valid':t.status==='review'?'Needs Review':'Exception'}</span></td>
+      </tr>`).join('') : `<tr><td colspan="11"><div class="empty-state"><p>No transactions match the current filters.</p></div></td></tr>`;
+    document.getElementById('tx-pager').innerHTML = `
+      <span>Showing ${rows.length?startIdx+1:0}–${Math.min(startIdx+State.txPageSize, rows.length)} of ${rows.length.toLocaleString()} transactions</span>
+      <span class="pbtns">
+        <button id="pg-prev" ${State.txPage<=1?'disabled':''}>‹</button>
+        <button disabled style="min-width:44px;">${State.txPage} / ${totalPages}</button>
+        <button id="pg-next" ${State.txPage>=totalPages?'disabled':''}>›</button>
+      </span>`;
+    const prev = document.getElementById('pg-prev'), next = document.getElementById('pg-next');
+    if (prev) prev.addEventListener('click', ()=>{ State.txPage--; this.renderTable(); });
+    if (next) next.addEventListener('click', ()=>{ State.txPage++; this.renderTable(); });
+  }
+};
+</script>
+<script>
+/* ================== REPORTS VIEW ================== */
+const ReportsView = {
+  render(){
+    const root = document.getElementById('content-root');
+    if (!State.transactions.length) { root.innerHTML = EmptyStates.noStatement(); return; }
+    const A = State.analytics;
+    const stats = ValidationEngine.run(State.transactions);
+    root.innerHTML = `
+      <div class="card">
+        <div class="card-head"><h3>Management Summary</h3><span class="card-sub">A clean, presentation-ready overview</span></div>
+        <p style="font-size:13.8px;color:var(--grey-600);line-height:1.6;">This statement covers ${State.transactions.filter(t=>t.date).length.toLocaleString()} dated transactions
+        with total inflow of ${Utils.fmtMoney(A.totalInflow,true)} and total outflow of ${Utils.fmtMoney(A.totalOutflow,true)}, a net movement of ${Utils.fmtMoney(A.netMovement,true)}.</p>
+        <div class="upload-actions" style="justify-content:flex-start;margin-top:18px;">
+          <button class="btn btn-primary" id="rep-pdf">Generate Management Report (PDF)</button>
+          <button class="btn btn-secondary" id="rep-xlsx">Export Processed Workbook (Excel)</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Data Validation Report</h3><span class="card-sub">Extraction, mapping and classification quality</span></div>
+        <div class="grid-2">
+          <div class="table-scroll"><table><tbody>
+            <tr><td>Total transactions</td><td class="num mono">${stats.total.toLocaleString()}</td></tr>
+            <tr><td>Balance consistency exceptions</td><td class="num mono">${stats.balanceExceptions}</td></tr>
+            <tr><td>Duplicate reference numbers</td><td class="num mono">${stats.duplicateRefs}</td></tr>
+            <tr><td>Missing dates</td><td class="num mono">${stats.missingDates}</td></tr>
+          </tbody></table></div>
+          <div class="table-scroll"><table><tbody>
+            <tr><td>Missing descriptions</td><td class="num mono">${stats.missingDesc}</td></tr>
+            <tr><td>Unclassified transactions</td><td class="num mono">${stats.unclassified}</td></tr>
+            <tr><td>Low-confidence classifications (&lt;60%)</td><td class="num mono">${State.transactions.filter(t=>t.confidence<60).length}</td></tr>
+            <tr><td>Transactions needing review</td><td class="num mono">${stats.needsReview}</td></tr>
+          </tbody></table></div>
+        </div>
+      </div>
+    `;
+    document.getElementById('rep-pdf').addEventListener('click', ()=> PdfReportEngine.generate());
+    document.getElementById('rep-xlsx').addEventListener('click', ()=> ExportEngine.exportExcel(State.transactions, 'BankLens_Processed_Transactions.xlsx'));
+  }
+};
+
+/* ================== SETTINGS VIEW ================== */
+const SettingsView = {
+  render(){
+    const root = document.getElementById('content-root');
+    const s = State.settings;
+    const map = LocalStore.getCategoryMap();
+    root.innerHTML = `
+      <div class="card">
+        <div class="card-head"><h3>Preferences</h3></div>
+        <div class="settings-grid">
+          <div class="setting-row"><label>Currency</label>
+            <select id="set-currency">
+              ${['INR','USD','EUR','GBP'].map(c=>`<option value="${c}" ${s.currency===c?'selected':''}>${c}</option>`).join('')}
+            </select>
+            <span class="hint">Applied across KPIs, charts and exports.</span>
+          </div>
+          <div class="setting-row"><label>Date format</label>
+            <select id="set-dateformat">
+              ${['DD-MM-YYYY','MM-DD-YYYY','YYYY-MM-DD'].map(f=>`<option value="${f}" ${s.dateFormat===f?'selected':''}>${f}</option>`).join('')}
+            </select>
+          </div>
+          <div class="setting-row"><label>Unusual transaction threshold</label>
+            <input type="number" id="set-threshold" min="1.5" step="0.5" value="${s.unusualThreshold}">
+            <span class="hint">Flag a transaction when it exceeds this multiple of its category average. Default: 3×.</span>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" id="set-save">Save Settings</button>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Category Mappings</h3><span class="card-sub">Saved locally in your browser — reused automatically for matching counterparties</span></div>
+        <div class="map-list" id="map-list">
+          ${Object.keys(map).length ? Object.entries(map).map(([k,v])=>`<div class="mrow"><span>${Utils.escapeHtml(k)} → <b>${Utils.escapeHtml(v)}</b></span><button data-remove-map="${Utils.escapeHtml(k)}">Remove</button></div>`).join('') : '<div class="empty-state"><p>No custom mappings saved yet.</p></div>'}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Privacy &amp; Data</h3></div>
+        <p style="font-size:13.5px;color:var(--grey-600);line-height:1.6;">Your financial data is confidential. Processing happens locally in your browser wherever supported. Files are never uploaded to a remote server. Only harmless category-mapping preferences are stored in your browser's local storage.</p>
+      </div>
+    `;
+    document.getElementById('set-save').addEventListener('click', ()=>{
+      State.settings.currency = document.getElementById('set-currency').value;
+      State.settings.dateFormat = document.getElementById('set-dateformat').value;
+      State.settings.unusualThreshold = parseFloat(document.getElementById('set-threshold').value) || 3;
+      LocalStore.setSettings(State.settings);
+      UIEngine.applyFilters();
+      Utils.toast('Settings saved.');
+    });
+    document.querySelectorAll('[data-remove-map]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ LocalStore.removeMapping(btn.dataset.removeMap); SettingsView.render(); });
+    });
+  }
+};
+</script>
+<script>
+/* ================== EXPORT ENGINE (Excel) ================== */
+const ExportEngine = {
+  exportExcel(transactions, filename){
+    const A = AnalyticsEngine.compute(transactions);
+    const wb = XLSX.utils.book_new();
+
+    const txSheet = transactions.map(t=>({
+      Date: t.date ? Utils.fmtDate(t.date) : '',
+      Description: t.description,
+      'Transaction Type': t.transactionType,
+      Counterparty: t.counterparty,
+      Reference: t.referenceNumber,
+      Debit: t.debit || '',
+      Credit: t.credit || '',
+      Balance: (t.balance!==null && t.balance!==undefined) ? t.balance : '',
+      Category: t.category,
+      'Confidence %': t.confidence,
+      Status: t.status,
+      Issues: t.issues.join('; ')
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(txSheet), 'Transactions');
+
+    const summary = [
+      ['Metric','Value'],
+      ['Total Transactions', A.totalCount],
+      ['Total Inflow', A.totalInflow],
+      ['Total Outflow', A.totalOutflow],
+      ['Net Movement', A.netMovement],
+      ['Opening Balance', A.openingBalance],
+      ['Closing Balance', A.closingBalance],
+      ['Bank Charges', A.bankCharges.total],
+      ['Interest Paid', A.interestPaid.total],
+      ['Interest Received', A.interestReceived.total],
+      ['Penalties', A.penalties.total]
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Summary');
+
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+      A.categoryOutflow.map(c=>({Category:c.category, Outflow:c.total}))
+    ), 'Categories');
+
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+      A.byType.map(t=>({Type:t.type, Count:t.count, Value:t.value}))
+    ), 'Transaction Types');
+
+    const exceptions = transactions.filter(t=>t.issues.length).map(t=>({
+      Date: t.date?Utils.fmtDate(t.date):'', Description:t.description, Status:t.status, Issues:t.issues.join('; ')
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exceptions.length?exceptions:[{Date:'',Description:'No exceptions found',Status:'',Issues:''}]), 'Exceptions');
+
+    const cpMap = {};
+    transactions.forEach(t=>{
+      const k = t.counterparty;
+      if (!cpMap[k]) cpMap[k] = { Counterparty:k, 'Total Paid':0, 'Total Received':0, Transactions:0 };
+      cpMap[k]['Total Paid'] += t.debit; cpMap[k]['Total Received'] += t.credit; cpMap[k].Transactions++;
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(Object.values(cpMap).sort((a,b)=>(b['Total Paid']+b['Total Received'])-(a['Total Paid']+a['Total Received']))), 'Counterparties');
+
+    XLSX.writeFile(wb, filename || 'BankLens_Processed_Transactions.xlsx');
+    Utils.toast('Excel workbook exported.');
+  }
+};
+
+/* ================== PDF REPORT ENGINE ================== */
+const PdfReportEngine = {
+  async generate(){
+    Utils.toast('Generating PDF report…');
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit:'pt', format:'a4' });
+    const A = State.analytics;
+    const pageW = doc.internal.pageSize.getWidth();
+    let y = 50;
+    const margin = 44;
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.setTextColor(14,27,44);
+    doc.text('BankLens — Management Report', margin, y); y += 22;
+    doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.setTextColor(90,100,115);
+    doc.text(`Statement: ${State.fileMeta.name}`, margin, y); y += 14;
+    doc.text(`Generated: ${Utils.fmtDate(new Date())}`, margin, y); y += 24;
+
+    const kpis = [
+      ['Total Transactions', A.totalCount.toLocaleString()],
+      ['Total Inflow', Utils.fmtMoney(A.totalInflow,true)],
+      ['Total Outflow', Utils.fmtMoney(A.totalOutflow,true)],
+      ['Net Movement', Utils.fmtMoney(A.netMovement,true)],
+      ['Opening Balance', A.openingBalance!==null?Utils.fmtMoney(A.openingBalance,true):'—'],
+      ['Closing Balance', A.closingBalance!==null?Utils.fmtMoney(A.closingBalance,true):'—'],
+      ['Bank Charges', Utils.fmtMoney(A.bankCharges.total,true)],
+      ['Interest Paid', Utils.fmtMoney(A.interestPaid.total,true)]
+    ];
+    doc.setDrawColor(227,231,237);
+    let kx = margin, ky = y, colW = (pageW-2*margin)/2;
+    kpis.forEach((k,i)=>{
+      const cx = margin + (i%2)*colW, cy = y + Math.floor(i/2)*40;
+      doc.setFontSize(8.5); doc.setTextColor(120,130,145); doc.text(k[0].toUpperCase(), cx, cy);
+      doc.setFontSize(13); doc.setTextColor(14,27,44); doc.setFont('helvetica','bold'); doc.text(String(k[1]), cx, cy+15);
+      doc.setFont('helvetica','normal');
+    });
+    y += Math.ceil(kpis.length/2)*40 + 16;
+
+    // monthly chart image
+    const monthlyCanvas = document.getElementById('chart-monthly');
+    if (monthlyCanvas) {
+      try {
+        const img = ChartEngine.instances['chart-monthly'].toBase64Image();
+        doc.setFontSize(12); doc.setTextColor(14,27,44); doc.setFont('helvetica','bold'); doc.text('Monthly Cash Flow', margin, y); y+=8;
+        doc.addImage(img, 'PNG', margin, y, pageW-2*margin, 170);
+        y += 190;
+      } catch(e){}
+    }
+
+    if (y > 650) { doc.addPage(); y = 50; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(14,27,44);
+    doc.text('Outflow by Category', margin, y); y += 16;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(60,70,80);
+    A.categoryOutflow.slice(0,8).forEach(c=>{
+      doc.text(c.category, margin, y);
+      doc.text(Utils.fmtMoney(c.total,true), pageW-margin, y, {align:'right'});
+      y += 15;
+    });
+    y += 10;
+
+    if (y > 650) { doc.addPage(); y = 50; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(14,27,44);
+    doc.text('Top Payment Recipients', margin, y); y += 16;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(60,70,80);
+    A.topPayees.slice(0,8).forEach(p=>{
+      doc.text(`${p.counterparty} (${p.count} txns)`, margin, y);
+      doc.text(Utils.fmtMoney(p.total,true), pageW-margin, y, {align:'right'});
+      y += 15;
+    });
+    y += 10;
+
+    if (y > 600) { doc.addPage(); y = 50; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(14,27,44);
+    doc.text('Top Receipt Sources', margin, y); y += 16;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(60,70,80);
+    A.topPayers.slice(0,8).forEach(p=>{
+      doc.text(`${p.counterparty} (${p.count} txns)`, margin, y);
+      doc.text(Utils.fmtMoney(p.total,true), pageW-margin, y, {align:'right'});
+      y += 15;
+    });
+
+    doc.addPage(); y = 50;
+    doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(14,27,44);
+    doc.text('Largest Transactions', margin, y); y += 18;
+    doc.setFontSize(10); doc.text('Largest Payments', margin, y); y += 14;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(60,70,80);
+    A.largestPayments.slice(0,6).forEach(t=>{ doc.text(`${Utils.fmtDate(t.date)}  ${t.counterparty}`.slice(0,60), margin, y); doc.text(Utils.fmtMoney(t.debit,true), pageW-margin, y, {align:'right'}); y+=13; });
+    y += 10; doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(14,27,44); doc.text('Largest Receipts', margin, y); y += 14;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(60,70,80);
+    A.largestReceipts.slice(0,6).forEach(t=>{ doc.text(`${Utils.fmtDate(t.date)}  ${t.counterparty}`.slice(0,60), margin, y); doc.text(Utils.fmtMoney(t.credit,true), pageW-margin, y, {align:'right'}); y+=13; });
+
+    y += 26;
+    if (y > 650) { doc.addPage(); y = 50; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(14,27,44);
+    doc.text('Management Insights', margin, y); y += 16;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(60,70,80);
+    State.insights.slice(0,10).forEach(ins=>{
+      const lines = doc.splitTextToSize('• ' + ins, pageW-2*margin);
+      lines.forEach(l=>{ if (y>760){ doc.addPage(); y=50; } doc.text(l, margin, y); y+=13; });
+      y += 3;
+    });
+
+    y += 10;
+    if (y > 700) { doc.addPage(); y = 50; }
+    const stats = ValidationEngine.run(State.transactions);
+    doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(14,27,44);
+    doc.text('Data Quality Summary', margin, y); y += 16;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(60,70,80);
+    [['Balance exceptions', stats.balanceExceptions], ['Duplicate references', stats.duplicateRefs], ['Unclassified transactions', stats.unclassified], ['Needs review', stats.needsReview]]
+      .forEach(([l,v])=>{ doc.text(`${l}: ${v}`, margin, y); y += 14; });
+
+    doc.setFontSize(8); doc.setTextColor(150,158,168);
+    doc.text('BankLens is an analytical prototype. Classification and anomaly detection may contain errors and should be reviewed by a qualified professional.', margin, 815);
+
+    doc.save('BankLens_Management_Report.pdf');
+    Utils.toast('PDF report downloaded.');
+  }
+};
+</script>
+<script>
+/* ================== APP INIT / EVENT WIRING ================== */
+(function init(){
+  FileHandler.init();
+
+  document.getElementById('nav-analyze').addEventListener('click', ()=> UIEngine.showPage('upload'));
+  document.getElementById('hero-analyze').addEventListener('click', ()=> UIEngine.showPage('upload'));
+  document.getElementById('nav-try-demo').addEventListener('click', ()=> FileHandler.startDemo());
+  document.getElementById('hero-demo').addEventListener('click', ()=> FileHandler.startDemo());
+  document.getElementById('upload-back-brand').addEventListener('click', ()=> UIEngine.showPage('landing'));
+  document.getElementById('upload-cancel').addEventListener('click', ()=> UIEngine.showPage('landing'));
+
+  document.querySelectorAll('.navitem[data-view]').forEach(el=>{
+    el.addEventListener('click', ()=> UIEngine.setView(el.dataset.view));
+  });
+  document.getElementById('new-statement-btn').addEventListener('click', ()=>{
+    FileHandler.clearFile();
+    State.transactions = []; State.filtered = [];
+    UIEngine.showPage('upload');
+  });
+  document.getElementById('menu-toggle').addEventListener('click', ()=>{
+    document.getElementById('sidebar').classList.toggle('open');
+  });
+  document.getElementById('tb-export-excel').addEventListener('click', ()=> ExportEngine.exportExcel(State.transactions, 'BankLens_Processed_Transactions.xlsx'));
+  document.getElementById('tb-export-pdf').addEventListener('click', ()=> {
+    if (State.currentView !== 'dashboard') UIEngine.setView('dashboard');
+    setTimeout(()=> PdfReportEngine.generate(), 300);
+  });
+
+  UIEngine.showPage('landing');
+})();
+</script>
+</body>
+</html>
