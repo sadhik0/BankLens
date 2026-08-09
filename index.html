@@ -970,10 +970,23 @@ const CategoryEngine = {
 };
 
 /* ================== PDF ENGINE ================== */
+// NOTE ON EXTRACTION STRATEGY
+// Bank-statement PDFs are rendered as tables, but PDF.js's getTextContent() returns text
+// fragments in whatever order they were written into the PDF's content stream -- for many
+// bank templates (including SBI's) that order is COLUMN-MAJOR, not row-major: every date in
+// the table, then every narration block, then every amount, rather than "date, narration,
+// amount" repeated per row. Concatenating the stream into one string and regex-splitting on
+// dates (the old approach) silently interleaves unrelated rows and cannot tell a Debit amount
+// from a Credit amount, because that distinction only exists as a COLUMN POSITION on the page,
+// not as a sign in the text. The fix below reconstructs the table using each fragment's (x, y)
+// position: fragments are clustered into visual lines by y, ordered left-to-right by x within
+// a line, and each transaction's Debit/Credit/Balance are read off by their column position
+// (the last three tokens on the date-anchored line) rather than by guessing from raw order.
 const PdfEngine = {
-  // heuristic line parser: looks for a date token + at least one numeric amount in a text line
-  DATE_RE: /\b(\d{1,2}[-\/][A-Za-z]{3}[-\/]\d{2,4}|\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}|\d{4}[-\/]\d{1,2}[-\/]\d{1,2})\b/,
-  AMOUNT_RE: /-?\(?\d[\d,]*\.\d{2}\)?/g,
+  DATE_TOK: /^\d{1,2}[-\/][A-Za-z]{3}[-\/]\d{2,4}$|^\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}$|^\d{4}[-\/]\d{1,2}[-\/]\d{1,2}$/,
+  AMOUNT_TOK: /^-?\(?\d[\d,]*\.\d{2}\)?$/,
+  Y_TOLERANCE: 2.5,
+
   async extract(file, onProgress){
     const buf = await file.arrayBuffer();
     let pdf;
@@ -983,52 +996,136 @@ const PdfEngine = {
       throw new Error('PASSWORD_OR_CORRUPT');
     }
     const totalPages = pdf.numPages;
-    let allText = [];
+    const pageData = [];
     let totalChars = 0;
     for (let p=1; p<=totalPages; p++){
       onProgress && onProgress(p, totalPages, 'reading');
       const page = await pdf.getPage(p);
       const content = await page.getTextContent();
-      const strs = content.items.map(it=>it.str);
-      const pageText = strs.join(' ');
-      totalChars += pageText.replace(/\s/g,'').length;
-      allText.push({ page:p, text: strs, raw: pageText });
+      const items = content.items
+        .map(it => ({ str: (it.str || '').trim(), x: it.transform[4], y: it.transform[5] }))
+        .filter(it => it.str.length);
+      totalChars += items.reduce((s,it)=> s + it.str.replace(/\s/g,'').length, 0);
+      pageData.push({ page: p, items });
     }
     const avgCharsPerPage = totalChars / totalPages;
-    const isDigital = avgCharsPerPage > 60; // heuristic threshold
+    const isDigital = avgCharsPerPage > 60; // heuristic threshold for "has real text, not scanned"
     if (isDigital) {
-      return { method:'text', pages: totalPages, data: allText };
+      return { method:'text', pages: totalPages, data: pageData };
     }
-    // fall back to OCR
     return { method:'ocr-needed', pages: totalPages, pdfDoc: pdf };
   },
-  linesFromPageItems(items){
-    // group text items into lines by y coordinate proximity using PDF.js content items with transform
-    return items; // items already strings; row grouping handled at extraction via textContent order (approx)
+
+  // Group position-tagged text fragments into visual lines (rows), ordered top-to-bottom,
+  // and left-to-right within each line.
+  buildLines(items){
+    const lines = [];
+    const sorted = [...items].sort((a,b)=> b.y - a.y || a.x - b.x);
+    sorted.forEach(it=>{
+      let line = lines.find(l => Math.abs(l.y - it.y) <= this.Y_TOLERANCE);
+      if (!line) { line = { y: it.y, items: [] }; lines.push(line); }
+      line.items.push(it);
+    });
+    lines.forEach(l => l.items.sort((a,b)=> a.x - b.x));
+    lines.sort((a,b)=> b.y - a.y);
+    return lines;
   },
-  parseRowsFromText(pageTextEntries){
-    // Build row-like records by scanning raw text per page for date+amount patterns.
-    // Since pdf.js text content loses strict row structure for complex tables, we use a best-effort
-    // approach: split on the extracted string stream by locating date occurrences.
+
+  // A "date-anchor" line is a table row that carries both the Value Date and Post Date
+  // columns (always the two leftmost cells in a transaction row), plus its Debit/Credit/
+  // Balance figures as its three rightmost cells -- regardless of what narration words (if
+  // any) sit between them on the same visual line.
+  isAnchorLine(line){
+    const toks = line.items.map(i=>i.str);
+    return toks.length >= 3 && this.DATE_TOK.test(toks[0]) && this.DATE_TOK.test(toks[1]);
+  },
+
+  // Reconstruct one row per transaction from position-clustered lines. A transaction's
+  // narration typically spans: an optional short "type" line just above the anchor line
+  // (e.g. "WDL TFR"), the anchor line itself (sometimes carrying inline narration such as
+  // "INTEREST CREDIT"), and continuation lines below it up to the next transaction's type
+  // line. Debit/Credit/Balance are always the last three tokens of the anchor line, in that
+  // column order -- this holds even when the Reference column is blank (common) or absent.
+  parseRowsPositional(pageData){
     const rows = [];
-    pageTextEntries.forEach(entry=>{
-      const text = entry.raw;
-      // split into chunks starting at each date occurrence
-      const dateMatches = [...text.matchAll(new RegExp(this.DATE_RE.source,'g'))];
+    pageData.forEach(entry => {
+      const lines = this.buildLines(entry.items);
+      const anchors = [];
+      lines.forEach((l,i)=>{ if (this.isAnchorLine(l)) anchors.push(i); });
+      const txs = [];
+      anchors.forEach((aidx, k) => {
+        const prevAidx = k > 0 ? anchors[k-1] : -1;
+        let typeLineIdx = -1;
+        const candIdx = aidx - 1;
+        if (candIdx > prevAidx) {
+          const cand = lines[candIdx];
+          const text = cand.items.map(i=>i.str).join(' ');
+          if (!/\d/.test(text) && cand.items.length <= 4) typeLineIdx = candIdx;
+        }
+        const prevContEnd = (typeLineIdx >= 0 ? typeLineIdx : aidx) - 1;
+        if (k > 0) {
+          const cont = lines.slice(prevAidx + 1, prevContEnd + 1);
+          txs[k-1].trailing = cont.map(l => l.items.map(i=>i.str).join(' ')).join(' ');
+        }
+        const anchorToks = lines[aidx].items.map(i=>i.str);
+        const last3 = anchorToks.slice(-3);
+        // Drop lone "-" tokens (the empty Reference column) so they don't pollute the narration.
+        const inlineMid = anchorToks.slice(2, anchorToks.length - 3).filter(t => t !== '-').join(' ');
+        const typeText = typeLineIdx >= 0 ? lines[typeLineIdx].items.map(i=>i.str).join(' ') : '';
+        txs.push({
+          dateRaw: anchorToks[0],
+          lead: (typeText + ' ' + inlineMid).trim(),
+          trailing: '',
+          debitTok: last3[0], creditTok: last3[1], balanceTok: last3[2],
+          _page: entry.page
+        });
+        if (k === anchors.length - 1) {
+          const cont = lines.slice(aidx + 1);
+          txs[k].trailing = cont.map(l => l.items.map(i=>i.str).join(' ')).join(' ');
+        }
+      });
+      txs.forEach(t=>{
+        const description = (t.lead + ' ' + t.trailing).replace(/\s+/g,' ').trim();
+        rows.push({
+          _rowNum: rows.length,
+          dateRaw: t.dateRaw,
+          description: description.slice(0,180),
+          debitRaw: this.AMOUNT_TOK.test(t.debitTok) ? t.debitTok : null,
+          creditRaw: this.AMOUNT_TOK.test(t.creditTok) ? t.creditTok : null,
+          amountRaw: null,
+          balanceRaw: this.AMOUNT_TOK.test(t.balanceTok) ? t.balanceTok : null,
+          referenceRaw: null,
+          _page: t._page
+        });
+      });
+    });
+    return rows;
+  },
+
+  // Fallback for PDFs that don't follow the row-anchor convention above (e.g. text truly
+  // comes out in row-major order already, or a very different table layout). This is the
+  // old flat-text heuristic: it cannot reliably distinguish Debit from Credit, so rows built
+  // this way are explicitly flagged lower-confidence for review.
+  parseRowsFlatFallback(pageData){
+    const rows = [];
+    const DATE_RE = /\b(\d{1,2}[-\/][A-Za-z]{3}[-\/]\d{2,4}|\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}|\d{4}[-\/]\d{1,2}[-\/]\d{1,2})\b/;
+    const AMOUNT_RE = /-?\(?\d[\d,]*\.\d{2}\)?/g;
+    pageData.forEach(entry=>{
+      const text = entry.items.map(i=>i.str).join(' ');
+      const dateMatches = [...text.matchAll(new RegExp(DATE_RE.source,'g'))];
       for (let i=0;i<dateMatches.length;i++){
         const start = dateMatches[i].index;
         const end = i+1<dateMatches.length ? dateMatches[i+1].index : text.length;
         const chunk = text.slice(start, end).trim();
-        const dateStr = dateMatches[i][0];
-        const amounts = chunk.match(this.AMOUNT_RE) || [];
-        const description = chunk.replace(this.DATE_RE, '').replace(this.AMOUNT_RE,'').trim();
+        const amounts = chunk.match(AMOUNT_RE) || [];
+        const description = chunk.replace(DATE_RE, '').replace(AMOUNT_RE,'').trim();
         rows.push({
           _rowNum: rows.length,
-          dateRaw: dateStr,
+          dateRaw: dateMatches[i][0],
           description: description.slice(0,140),
           debitRaw: null,
           creditRaw: null,
-          amountRaw: amounts.length ? amounts[amounts.length>1?0:0] : null,
+          amountRaw: amounts.length ? amounts[0] : null,
           balanceRaw: amounts.length>1 ? amounts[amounts.length-1] : null,
           referenceRaw: null,
           _page: entry.page,
@@ -1563,9 +1660,15 @@ const ProcessingUI = {
         let rawRows;
         let sourceType = 'pdf';
         if (result.method === 'text') {
-          document.getElementById('proc-sub').textContent = 'Digital PDF detected. Extracting transaction data.';
+          document.getElementById('proc-sub').textContent = 'Digital PDF detected. Reconstructing table from character positions.';
           this.setProgress(45);
-          rawRows = PdfEngine.parseRowsFromText(result.data);
+          rawRows = PdfEngine.parseRowsPositional(result.data);
+          if (!rawRows.length) {
+            // This statement's layout doesn't match the row-anchor convention -- fall back to
+            // the flat-text heuristic, which cannot reliably separate Debit from Credit, so
+            // those rows get flagged lower-confidence below.
+            rawRows = PdfEngine.parseRowsFlatFallback(result.data);
+          }
         } else {
           document.getElementById('proc-sub').textContent = 'This appears to be a scanned statement. OCR will be used to read the document.';
           await sleep(400);
@@ -1573,7 +1676,9 @@ const ProcessingUI = {
             document.getElementById('proc-sub').textContent = `OCR processing: ${Math.round(progress*100)}%`;
             this.setProgress(45 + progress*30);
           });
-          rawRows = PdfEngine.parseRowsFromText(ocrEntries);
+          // OCR output has no per-character position data, so Debit/Credit columns can't be
+          // reconstructed reliably -- use the flat-text heuristic and flag every row for review.
+          rawRows = PdfEngine.parseRowsFlatFallback(ocrEntries.map(e => ({ page: e.page, items: [{ str: e.raw }] })));
           rawRows.forEach(r=> r._ocr = true);
         }
 
@@ -1722,7 +1827,11 @@ const VerifyUI = {
     if (stats.missingDesc) problems.push(`${stats.missingDesc} transaction(s) have missing descriptions.`);
     if (stats.unclassified) problems.push(`${stats.unclassified} transaction(s) could not be automatically classified.`);
     if (State.pdfExtraction && State.pdfExtraction.method !== 'text') problems.push('This statement was read using OCR. Please verify extracted amounts and dates carefully against the source document.');
-    else if (State.fileMeta && State.fileMeta.ext==='pdf') problems.push('PDF text extraction is best-effort. Row grouping may not perfectly match complex table layouts — verify totals against the source document.');
+    else if (State.fileMeta && State.fileMeta.ext==='pdf') {
+      const flat = State.transactions.filter(t=> t.sourceType==='pdf' && t.issues.some(i=>i.includes('Best-effort'))).length;
+      if (flat > 0) problems.push(`${flat} transaction(s) were extracted using a flat-text fallback (the table layout didn't match the standard row convention), so Debit vs Credit could not be reliably distinguished — verify these against the source document.`);
+      else problems.push('PDF table structure was reconstructed from character positions on the page. Verify totals against the source document, especially for unusual layouts.');
+    }
 
     issuesEl.innerHTML = problems.length
       ? `<div class="insight-list">${problems.map(p=>`<div class="insight-card"><span class="idot" style="background:var(--amber)"></span><p>${Utils.escapeHtml(p)}</p></div>`).join('')}</div>`
