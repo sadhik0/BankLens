@@ -8,7 +8,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.3/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
 <style>
@@ -1876,10 +1875,6 @@ const UIEngine = {
     const titles = { dashboard:'Analytics Dashboard', insights:'Management Insights', transactions:'Transactions', reports:'Reports', settings:'Settings' };
     document.getElementById('view-title').textContent = titles[view] || 'BankLens';
     document.getElementById('sidebar').classList.remove('open');
-    // Leaving the dashboard tears down its Chart.js instances so they never hold on to
-    // detached canvases; the dashboard rebuilds them fresh from current filtered data
-    // whenever it's shown again.
-    if (view !== 'dashboard') ChartEngine.destroyAll();
     if (view==='dashboard') DashboardView.render();
     else if (view==='insights') InsightsView.render();
     else if (view==='transactions') TransactionsView.render();
@@ -1970,104 +1965,6 @@ const UIEngine = {
 };
 </script>
 <script>
-/* ================== CHART ENGINE ================== */
-const ChartEngine = {
-  instances: {},
-  colors: { blue:'#3B6FE0', navy:'#0E1B2C', green:'#1E8E5A', amber:'#B5750F', red:'#C4392B', grey:'#9AA6B2',
-    palette:['#3B6FE0','#1E8E5A','#B5750F','#C4392B','#7C5CD6','#0E7A8C','#D6733B','#5C6B7A','#9C4CC4','#2FA1A1'] },
-  destroy(id){
-    if (this.instances[id]) { this.instances[id].destroy(); delete this.instances[id]; }
-    // Safety net: if a chart was ever attached to this canvas outside of our own
-    // registry (e.g. after a rapid re-render), make sure Chart.js doesn't refuse
-    // to reuse the canvas with a "Canvas is already in use" error.
-    const canvas = document.getElementById(id);
-    if (canvas && typeof Chart.getChart === 'function') {
-      const stray = Chart.getChart(canvas);
-      if (stray) stray.destroy();
-    }
-  },
-  destroyAll(){ Object.keys(this.instances).forEach(id=> this.destroy(id)); },
-  monthlyBar(id, monthly){
-    this.destroy(id);
-    const ctx = document.getElementById(id); if (!ctx) return;
-    this.instances[id] = new Chart(ctx, {
-      type:'bar',
-      data:{ labels: monthly.map(m=>m.label),
-        datasets:[
-          {label:'Inflow', data:monthly.map(m=>m.inflow), backgroundColor:this.colors.blue, borderRadius:4, maxBarThickness:28},
-          {label:'Outflow', data:monthly.map(m=>m.outflow), backgroundColor:this.colors.red, borderRadius:4, maxBarThickness:28}
-        ]},
-      options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{position:'top', labels:{usePointStyle:true, boxWidth:8, font:{family:'Manrope', size:12}}},
-          tooltip:{callbacks:{label: c=> `${c.dataset.label}: ${Utils.fmtMoney(c.parsed.y, true)}`}} },
-        scales:{ y:{ ticks:{ callback:v=>Utils.fmtMoney(v,true), font:{family:'IBM Plex Mono', size:10.5} }, grid:{color:'#EEF1F5'} },
-          x:{ grid:{display:false}, ticks:{font:{family:'Manrope', size:11}} } }
-      }
-    });
-  },
-  netTrendLine(id, monthly){
-    this.destroy(id);
-    const ctx = document.getElementById(id); if (!ctx) return;
-    this.instances[id] = new Chart(ctx, {
-      type:'line',
-      data:{ labels: monthly.map(m=>m.label),
-        datasets:[{ label:'Net Cash Movement', data: monthly.map(m=>m.net), borderColor:this.colors.blue,
-          backgroundColor:'rgba(59,111,224,.1)', fill:true, tension:.3, pointRadius:3,
-          segment:{ borderColor: ctx2=> ctx2.p0.parsed.y<0 || ctx2.p1.parsed.y<0 ? this.colors.red : this.colors.blue }
-        }]},
-      options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>`Net: ${Utils.fmtMoney(c.parsed.y,true)}`}} },
-        scales:{ y:{ ticks:{callback:v=>Utils.fmtMoney(v,true), font:{family:'IBM Plex Mono', size:10.5}}, grid:{color:'#EEF1F5'} },
-          x:{ grid:{display:false} } }
-      }
-    });
-  },
-  horizontalBar(id, items, labelKey, valueKey, color){
-    this.destroy(id);
-    const ctx = document.getElementById(id); if (!ctx) return;
-    const top = items.slice(0,10);
-    this.instances[id] = new Chart(ctx, {
-      type:'bar',
-      data:{ labels: top.map(i=>i[labelKey]), datasets:[{ data: top.map(i=>i[valueKey]), backgroundColor: color||this.colors.blue, borderRadius:4, maxBarThickness:20 }]},
-      options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>Utils.fmtMoney(c.parsed.x,true)}} },
-        scales:{ x:{ ticks:{callback:v=>Utils.fmtMoney(v,true), font:{family:'IBM Plex Mono', size:10.5}}, grid:{color:'#EEF1F5'} },
-          y:{ grid:{display:false}, ticks:{font:{family:'Manrope', size:11.5}} } }
-      }
-    });
-  },
-  doughnut(id, items, labelKey, valueKey){
-    this.destroy(id);
-    const ctx = document.getElementById(id); if (!ctx) return;
-    const top = items.slice(0,8);
-    this.instances[id] = new Chart(ctx, {
-      type:'doughnut',
-      data:{ labels: top.map(i=>i[labelKey]), datasets:[{ data: top.map(i=>i[valueKey]), backgroundColor:this.colors.palette, borderWidth:2, borderColor:'#fff' }]},
-      options:{ responsive:true, maintainAspectRatio:false, cutout:'62%',
-        plugins:{ legend:{position:'right', labels:{boxWidth:9, font:{family:'Manrope', size:11}}},
-          tooltip:{callbacks:{label:c=>`${c.label}: ${Utils.fmtMoney(c.parsed,true)}`}} }
-      }
-    });
-  },
-  typeCountValue(id, byType){
-    this.destroy(id);
-    const ctx = document.getElementById(id); if (!ctx) return;
-    const top = byType.slice(0,8);
-    this.instances[id] = new Chart(ctx, {
-      type:'bar',
-      data:{ labels: top.map(t=>t.type),
-        datasets:[
-          {label:'Count', data: top.map(t=>t.count), backgroundColor:this.colors.blue, yAxisID:'y', borderRadius:4, maxBarThickness:26},
-        ]},
-      options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{display:false} },
-        scales:{ y:{ ticks:{font:{family:'IBM Plex Mono', size:10.5}}, grid:{color:'#EEF1F5'} }, x:{grid:{display:false}} }
-      }
-    });
-  }
-};
-</script>
-<script>
 /* ================== DASHBOARD VIEW ================== */
 const DashboardView = {
   render(){
@@ -2096,101 +1993,12 @@ const DashboardView = {
         ${this.kpi('Exceptions', (State.filtered.filter(t=>t.status==='exception').length).toLocaleString(), `${State.filtered.filter(t=>t.status==='review').length} need review`, 'red')}
       </div>
 
-      ${A.balanceMismatch ? `<div class="limitation-note">⚠️ <span>Net movement calculated from transactions does not fully match the change in statement balance. This has been flagged as a balance consistency exception — see Transactions Requiring Review.</span></div>` : ''}
-
-      <div class="card" id="sec-monthly">
-        <div class="card-head"><h3>Monthly Cash Flow</h3><span class="card-sub">Inflow vs outflow by month</span></div>
-        ${A.monthly.length ? `<div class="chart-wrap"><canvas id="chart-monthly"></canvas></div>` : EmptyStates.inline('No dated transactions available to build a monthly view.')}
-      </div>
-      <div class="card">
-        <div class="card-head"><h3>Cash Flow Trend</h3><span class="card-sub">Monthly net cash movement</span></div>
-        ${A.monthly.length ? `<div class="chart-wrap"><canvas id="chart-trend"></canvas></div>` : EmptyStates.inline('No dated transactions available.')}
-      </div>
-
-      <div class="card" id="sec-category">
-        <div class="card-head"><h3>Where Did the Money Go?</h3><span class="card-sub">Outflow by category</span></div>
-        ${A.categoryOutflow.length ? `<div class="two-col"><div class="chart-wrap"><canvas id="chart-cat-out"></canvas></div>
-          <div class="table-scroll"><table><thead><tr><th>Category</th><th class="num">Amount</th><th class="num">% of outflow</th></tr></thead><tbody>
-          ${A.categoryOutflow.slice(0,10).map(c=>`<tr><td>${Utils.escapeHtml(c.category)}</td><td class="num mono">${Utils.fmtMoney(c.total,true)}</td><td class="num mono">${A.totalOutflow?((c.total/A.totalOutflow)*100).toFixed(1):'0'}%</td></tr>`).join('')}
-          </tbody></table></div></div>` : EmptyStates.inline('No outflow transactions in the current filter.')}
-      </div>
-
-      <div class="card" id="sec-type">
-        <div class="card-head"><h3>How Was Money Moved?</h3><span class="card-sub">Transaction type — count vs value (never confuse frequency with amount)</span></div>
-        ${A.byType.length ? `<div class="two-col">
-          <div class="chart-wrap"><canvas id="chart-type"></canvas></div>
-          <div class="table-scroll"><table><thead><tr><th>Type</th><th class="num">Count</th><th class="num">Value</th></tr></thead><tbody>
-          ${A.byType.map(t=>`<tr><td>${Utils.escapeHtml(t.type)}</td><td class="num mono">${t.count.toLocaleString()}</td><td class="num mono">${Utils.fmtMoney(t.value,true)}</td></tr>`).join('')}
-          </tbody></table></div></div>` : EmptyStates.inline('No transactions in the current filter.')}
-      </div>
-
-      <div class="card" id="sec-payees">
-        <div class="card-head"><h3>Who Did We Pay?</h3><span class="card-sub">Top 10 payment recipients</span></div>
-        ${A.topPayees.length ? this.counterpartyTable(A.topPayees,'Total Paid') : EmptyStates.inline('No payment recipients found.')}
-      </div>
-      <div class="card" id="sec-payers">
-        <div class="card-head"><h3>Who Paid Us?</h3><span class="card-sub">Top 10 receipt sources</span></div>
-        ${A.topPayers.length ? this.counterpartyTable(A.topPayers,'Total Received') : EmptyStates.inline('No receipt sources found.')}
-      </div>
-
-      <div class="card" id="sec-largest">
-        <div class="card-head"><h3>Largest Transactions</h3></div>
-        <div class="two-col">
-          <div><h4 style="font-size:13.5px;color:var(--grey-600);margin-bottom:8px;">Largest Payments</h4>${this.txMiniTable(A.largestPayments,'debit')}</div>
-          <div><h4 style="font-size:13.5px;color:var(--grey-600);margin-bottom:8px;">Largest Receipts</h4>${this.txMiniTable(A.largestReceipts,'credit')}</div>
-        </div>
-      </div>
-
-      <div class="card" id="sec-charges">
-        <div class="card-head"><h3>Charges, Interest &amp; Penalties</h3></div>
-        <div class="kpi-row" style="margin-bottom:0;">
-          ${this.kpi('Bank Charges', Utils.fmtMoney(A.bankCharges.total,true), `${A.bankCharges.count} txns · avg ${A.bankCharges.count?Utils.fmtMoney(A.bankCharges.total/A.bankCharges.count,true):'—'}`, 'amber')}
-          ${this.kpi('Interest Paid', Utils.fmtMoney(A.interestPaid.total,true), `${A.interestPaid.count} txns`, 'red')}
-          ${this.kpi('Interest Received', Utils.fmtMoney(A.interestReceived.total,true), `${A.interestReceived.count} txns`, 'green')}
-          ${this.kpi('Penalties', Utils.fmtMoney(A.penalties.total,true), `${A.penalties.count} txns`, 'red')}
-        </div>
-      </div>
-
-      <div class="card" id="sec-recurring">
-        <div class="card-head"><h3>Recurring Payments</h3><span class="card-sub">Potential recurring transactions, based on similar amount, counterparty and repeated monthly intervals</span></div>
-        ${A.recurring.length ? `<div class="table-scroll"><table><thead><tr><th>Counterparty</th><th>Category</th><th>Direction</th><th class="num">Occurrences</th><th class="num">Avg Amount</th></tr></thead><tbody>
-          ${A.recurring.slice(0,15).map(r=>`<tr><td>${Utils.escapeHtml(r.counterparty)}</td><td>${Utils.escapeHtml(r.category)}</td><td>${r.direction==='outflow'?'Outflow':'Inflow'}</td><td class="num mono">${r.count}</td><td class="num mono">${Utils.fmtMoney(r.avgAmount,true)}</td></tr>`).join('')}
-          </tbody></table></div>` : EmptyStates.inline('No potential recurring transactions were identified.')}
-      </div>
-
-      <div class="card" id="sec-review">
-        <div class="card-head"><h3>Transactions Requiring Review</h3><span class="card-sub">Flagged using transparent, explainable rules — not a fraud determination</span></div>
-        ${A.unusual.length ? `<div class="table-scroll"><table><thead><tr><th>Date</th><th>Description</th><th>Category</th><th class="num">Amount</th><th>Reason</th></tr></thead><tbody>
-          ${A.unusual.slice(0,15).map(u=>`<tr><td>${Utils.fmtDate(u.tx.date)}</td><td>${Utils.escapeHtml(u.tx.description)}</td><td>${Utils.escapeHtml(u.tx.category)}</td><td class="num mono">${Utils.fmtMoney(u.tx.debit||u.tx.credit,true)}</td><td style="color:var(--amber);font-size:12.5px;">${Utils.escapeHtml(u.reason)}</td></tr>`).join('')}
-          </tbody></table></div>` : EmptyStates.inline('No transactions requiring review were identified under the current threshold.')}
-      </div>
-
-      <div class="card">
-        <div class="card-head"><h3>Management Insights</h3><span class="card-sub">Automatically generated from the current dataset</span></div>
-        ${InsightsView.listHTML()}
-      </div>
+      ${A.balanceMismatch ? `<div class="limitation-note">⚠️ <span>Net movement calculated from transactions does not fully match the change in statement balance. This has been flagged as a balance consistency exception — see the Transactions tab.</span></div>` : ''}
     `;
-    // Charts are rebuilt from State.analytics, which is recomputed from State.filtered
-    // every time filters change (see UIEngine.applyFilters). This keeps KPIs, charts and
-    // insights all reading from the same filtered dataset on every render pass.
-    if (A.monthly.length) { ChartEngine.monthlyBar('chart-monthly', A.monthly); ChartEngine.netTrendLine('chart-trend', A.monthly); }
-    if (A.categoryOutflow.length) ChartEngine.horizontalBar('chart-cat-out', A.categoryOutflow, 'category','total', ChartEngine.colors.blue);
-    if (A.byType.length) ChartEngine.typeCountValue('chart-type', A.byType);
     UIEngine.bindFiltersBar(()=> DashboardView.render());
   },
   kpi(label, value, sub, accent){
     return `<div class="kpi accent-${accent}"><div class="klabel">${label}</div><div class="kvalue">${value}</div><div class="ksub">${Utils.escapeHtml(sub||'')}</div></div>`;
-  },
-  counterpartyTable(list, totalLabel){
-    return `<div class="table-scroll"><table><thead><tr><th>#</th><th>Counterparty</th><th class="num">Transactions</th><th class="num">${totalLabel}</th><th class="num">Average</th><th class="num">Largest</th></tr></thead><tbody>
-      ${list.map((p,i)=>`<tr><td><span class="rank-badge">${i+1}</span></td><td>${Utils.escapeHtml(p.counterparty)}</td><td class="num mono">${p.count}</td><td class="num mono">${Utils.fmtMoney(p.total,true)}</td><td class="num mono">${Utils.fmtMoney(p.avg,true)}</td><td class="num mono">${Utils.fmtMoney(p.largest,true)}</td></tr>`).join('')}
-      </tbody></table></div>`;
-  },
-  txMiniTable(list, kind){
-    if (!list.length) return EmptyStates.inline('None found.');
-    return `<div class="table-scroll"><table><thead><tr><th>Date</th><th>Counterparty</th><th class="num">Amount</th><th>Category</th></tr></thead><tbody>
-      ${list.map(t=>`<tr><td>${Utils.fmtDate(t.date)}</td><td>${Utils.escapeHtml(t.counterparty)}</td><td class="num mono ${kind==='credit'?'amt-credit':'amt-debit'}">${Utils.fmtMoney(kind==='credit'?t.credit:t.debit,true)}</td><td>${Utils.escapeHtml(t.category)}</td></tr>`).join('')}
-      </tbody></table></div>`;
   }
 };
 
@@ -2207,19 +2015,20 @@ const EmptyStates = {
 <script>
 /* ================== INSIGHTS VIEW ================== */
 const InsightsView = {
-  listHTML(){
-    if (!State.insights || !State.insights.length) return EmptyStates.inline('No insights could be generated from the current filter.');
-    return `<div class="insight-list">${State.insights.map(i=>`<div class="insight-card"><span class="idot"></span><p>${Utils.escapeHtml(i)}</p></div>`).join('')}</div>`;
+  listHTML(insights){
+    if (!insights || !insights.length) return EmptyStates.inline('No insights could be generated from this dataset.');
+    return `<div class="insight-list">${insights.map(i=>`<div class="insight-card"><span class="idot"></span><p>${Utils.escapeHtml(i)}</p></div>`).join('')}</div>`;
   },
   render(){
     const root = document.getElementById('content-root');
     if (!State.transactions.length) { root.innerHTML = EmptyStates.noStatement(); return; }
-    const A = State.analytics;
+    // Insights always reflect the complete statement, independent of any Dashboard filters.
+    const A = AnalyticsEngine.compute(State.transactions);
+    const insights = InsightEngine.generate(A, State.transactions);
     root.innerHTML = `
-      ${UIEngine.filtersBarHTML()}
       <div class="card">
-        <div class="card-head"><h3>Management Insights</h3><span class="card-sub">Deterministic observations generated directly from the current dataset — no AI-generated commentary</span></div>
-        ${this.listHTML()}
+        <div class="card-head"><h3>Management Insights</h3><span class="card-sub">Deterministic observations generated directly from the full statement — no AI-generated commentary</span></div>
+        ${this.listHTML(insights)}
       </div>
       <div class="card">
         <div class="card-head"><h3>Sample Management Story</h3><span class="card-sub">A quick narrative summary of this statement</span></div>
@@ -2238,12 +2047,11 @@ const InsightsView = {
             <tr><td>Largest payment</td><td class="num mono">${A.highestOutflowTx?Utils.fmtMoney(A.highestOutflowTx.debit,true):'—'}</td></tr>
             <tr><td>Largest receipt</td><td class="num mono">${A.highestInflowTx?Utils.fmtMoney(A.highestInflowTx.credit,true):'—'}</td></tr>
             <tr><td>Bank charges</td><td class="num mono">${Utils.fmtMoney(A.bankCharges.total,true)}</td></tr>
-            <tr><td>Unclassified value</td><td class="num mono">${Utils.fmtMoney(State.filtered.filter(t=>t.category==='Unclassified').reduce((s,t)=>s+t.debit+t.credit,0),true)}</td></tr>
+            <tr><td>Unclassified value</td><td class="num mono">${Utils.fmtMoney(State.transactions.filter(t=>t.category==='Unclassified').reduce((s,t)=>s+t.debit+t.credit,0),true)}</td></tr>
           </tbody></table></div>
         </div>
       </div>
     `;
-    UIEngine.bindFiltersBar(()=> InsightsView.render());
   }
 };
 
